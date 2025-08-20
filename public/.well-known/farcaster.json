@@ -1,0 +1,29 @@
+{
+  "frame": {
+    "name": "Stride & Rise Contributions",
+    "version": "1",
+    "iconUrl": "https://run-based.vercel.app/icon.png",
+    "homeUrl": "https://run-based.vercel.app",
+    "subtitle": "Track, earn, and celebrate your run club contributions.",
+    "description": "Turn Stride & Rise run-club contributions into badges and community ownership.",
+    "primaryCategory": "health-fitness",
+    "imageUrl": "https://run-based.vercel.app/hero.png",
+    "heroImageUrl": "https://run-based.vercel.app/hero.png",
+    "splashImageUrl": "https://run-based.vercel.app/splash.png",
+    "splashBackgroundColor": "#000000",
+    "tags": [
+      "running",
+      "fitness",
+      "community",
+      "run",
+      "social"
+    ],
+    "tagline": "Own your stride",
+    "buttonTitle": "Join Now",
+    "ogTitle": "Stride and Rise Contributions",
+    "ogDescription": "Run with us and earn badges for your contributions.",
+    "ogImageUrl": "https://run-based.vercel.app/hero.png",
+    "castShareUrl": "https://run-based.vercel.app",
+    "webhookUrl": "https://run-based.vercel.app/api/webhook"
+  }
+}
