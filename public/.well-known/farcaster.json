@@ -1,4 +1,10 @@
 {
+    
+  "accountAssociation": {
+    "header": "eyJmaWQiOjM5OTExMSwidHlwZSI6ImN1c3RvZHkiLCJrZXkiOiIweGNBNDE2YzlhMDQyYUJhOWE3OUJkNDUyZDFCYzJGMjdmRjNlMzlhM0YifQ",
+    "payload": "eyJkb21haW4iOiJydW4tYmFzZWQudmVyY2VsLmFwcCJ9",
+    "signature": "MHhjNzRlMDc5MWZlZmJmNzczNjgzYjg0ZTEyMDJkMGEwMGI2ZjViODRhYWI3MGNlNWQwYmU3ZGEzZGVlYzRhNGI3M2M2OTNkMmYxZWFmNGYyMTU3OTg2OWM0ZGJhZmEyYzUzZTFiNmUwNjIwMmM2MmUzYzYyZjUxNDZiNGMwY2RlYjFi"
+  },
   "frame": {
     "name": "Stride & Rise Contributions",
     "version": "1",
