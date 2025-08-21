@@ -7,6 +7,8 @@ import {
   makeBlockchainContribution, 
   getSuccessMessage,
   getPointsForType,
+  getNetworkInfo,
+  getDebugInfo,
   type ContributionType,
   type BlockchainTotals 
 } from "../lib/blockchain-store";
@@ -30,12 +32,22 @@ export default function ContributionButtons() {
   const [toast, setToast] = React.useState<string | null>(null);
   const [loading, setLoading] = React.useState<string | null>(null);
   const [shareReady, setShareReady] = React.useState<{ title: string } | null>(null);
+  const [networkInfo, setNetworkInfo] = React.useState<{
+    chainId: number;
+    chainName: string;
+    isCorrectNetwork: boolean;
+    expectedChainId: number;
+    expectedChainName: string;
+  } | null>(null);
+  const [showDebug, setShowDebug] = React.useState(false);
+  const [lastTransaction, setLastTransaction] = React.useState<{ hash: string; explorerUrl: string } | null>(null);
   const appUrl = process.env.NEXT_PUBLIC_URL || "https://run-based.vercel.app";
 
-  // Load blockchain data when wallet connects
+  // Load blockchain data and network info when wallet connects
   React.useEffect(() => {
     if (address) {
       getBlockchainTotals(address).then(setTotals);
+      getNetworkInfo().then(setNetworkInfo);
     }
   }, [address]);
 
@@ -46,19 +58,42 @@ export default function ContributionButtons() {
       return;
     }
 
+    // Check network before proceeding
+    const currentNetworkInfo = await getNetworkInfo();
+    setNetworkInfo(currentNetworkInfo);
+    
+    if (!currentNetworkInfo.isCorrectNetwork) {
+      setToast(`Wrong network! Please switch to ${currentNetworkInfo.expectedChainName}`);
+      setTimeout(() => setToast(null), 4000);
+      return;
+    }
+
     setLoading(key);
+    setLastTransaction(null);
     
     try {
-      // Make blockchain transaction
-      await makeBlockchainContribution(key);
+      // Show transaction submitted message
+      setToast("Transaction submitted... ⏳");
       
-      // Refresh data from blockchain
-      const newTotals = await getBlockchainTotals(address);
-      setTotals(newTotals);
+      // Make blockchain transaction and wait for confirmation
+      const result = await makeBlockchainContribution(key);
+      setLastTransaction(result);
       
-      const msg = getSuccessMessage(key);
-      setToast(`${msg} + NFT minted! 🎉`);
-      setShareReady({ title: msg });
+      // Show transaction hash briefly
+      setToast(`Transaction confirmed! Hash: ${result.hash.slice(0, 10)}...`);
+      
+      // Wait a moment then refresh data from blockchain
+      setTimeout(async () => {
+        const newTotals = await getBlockchainTotals(address);
+        setTotals(newTotals);
+        
+        const msg = getSuccessMessage(key);
+        setToast(`${msg} + NFT minted! 🎉`);
+        setShareReady({ title: msg });
+        
+        setTimeout(() => setToast(null), 3000);
+      }, 1000);
+      
     } catch (error: unknown) {
       console.error('Transaction failed:', error);
       let errorMessage = "Transaction failed";
@@ -69,14 +104,16 @@ export default function ContributionButtons() {
         errorMessage = "Already contributed today ✅";
       } else if (errorObj.message?.includes("User rejected")) {
         errorMessage = "Transaction cancelled";
+      } else if (errorObj.message?.includes("Wrong network")) {
+        errorMessage = errorObj.message;
       } else if (errorObj.shortMessage) {
         errorMessage = errorObj.shortMessage;
       }
       
       setToast(errorMessage);
+      setTimeout(() => setToast(null), 4000);
     } finally {
       setLoading(null);
-      setTimeout(() => setToast(null), 3000);
     }
   }
 
@@ -156,6 +193,44 @@ export default function ContributionButtons() {
         <div><strong>Streak</strong><div>{totals.streak || 0} 🔥</div></div>
       </div>
 
+      {/* Network Status */}
+      {networkInfo && (
+        <div style={{
+          background: networkInfo.isCorrectNetwork ? "#d4edda" : "#f8d7da",
+          border: networkInfo.isCorrectNetwork ? "1px solid #c3e6cb" : "1px solid #f5c6cb",
+          padding: 12, borderRadius: 12, fontSize: 14
+        }}>
+          <div style={{ fontWeight: 600, marginBottom: 4 }}>
+            🌐 Network: {networkInfo.chainName}
+          </div>
+          {!networkInfo.isCorrectNetwork && (
+            <div style={{ color: "#721c24" }}>
+              ⚠️ Please switch to {networkInfo.expectedChainName}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Last Transaction */}
+      {lastTransaction && (
+        <div style={{
+          background: "#e8f5e8", padding: 12, borderRadius: 12, border: "1px solid #90ee90"
+        }}>
+          <div style={{ fontWeight: 600, marginBottom: 4 }}>✅ Last Transaction</div>
+          <div style={{ fontSize: 12, fontFamily: "monospace", marginBottom: 4 }}>
+            {lastTransaction.hash}
+          </div>
+          <a 
+            href={lastTransaction.explorerUrl} 
+            target="_blank" 
+            rel="noopener noreferrer"
+            style={{ fontSize: 12, color: "#0066cc", textDecoration: "underline" }}
+          >
+            View on BaseScan →
+          </a>
+        </div>
+      )}
+
       {totals.badges.length > 0 && (
         <div style={{
           background: "#fff3cd", padding: 12, borderRadius: 12, border: "1px solid #ffeaa7"
@@ -164,6 +239,32 @@ export default function ContributionButtons() {
           <div style={{ fontSize: 14 }}>
             {totals.badges.join(", ")}
           </div>
+        </div>
+      )}
+
+      {/* Debug Info Toggle */}
+      <button 
+        onClick={() => setShowDebug(!showDebug)}
+        style={{
+          padding: 8, fontSize: 12, background: "#f8f9fa", border: "1px solid #dee2e6",
+          borderRadius: 8, cursor: "pointer"
+        }}
+      >
+        {showDebug ? "Hide" : "Show"} Debug Info
+      </button>
+
+      {showDebug && (
+        <div style={{
+          background: "#f8f9fa", padding: 12, borderRadius: 12, border: "1px solid #dee2e6",
+          fontSize: 12, fontFamily: "monospace"
+        }}>
+          <div><strong>Debug Information:</strong></div>
+          <div>Contract: {getDebugInfo().contractAddress}</div>
+          <div>Expected Chain: {getDebugInfo().expectedChainName} ({getDebugInfo().expectedChainId})</div>
+          <div>Current Chain: {networkInfo?.chainName} ({networkInfo?.chainId})</div>
+          <div>Explorer: {getDebugInfo().explorerUrl}</div>
+          <div>Wallet Connected: {address ? 'Yes' : 'No'}</div>
+          {address && <div>Address: {address}</div>}
         </div>
       )}
 

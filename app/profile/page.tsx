@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { useAccount } from 'wagmi';
-import { getBlockchainTotals, type BlockchainTotals } from "../../lib/blockchain-store";
+import { getBlockchainTotals, getNetworkInfo, getDebugInfo, type BlockchainTotals } from "../../lib/blockchain-store";
 import TipButton from "../../components/TipButton";
 
 export default function ProfilePage() {
@@ -12,11 +12,19 @@ export default function ProfilePage() {
     points: 0, streak: 0, badges: [],
     tipsReceived: 0, tipsSent: 0
   });
+  const [networkInfo, setNetworkInfo] = React.useState<{
+    chainId: number;
+    chainName: string;
+    isCorrectNetwork: boolean;
+    expectedChainId: number;
+    expectedChainName: string;
+  } | null>(null);
 
-  // Load blockchain data when wallet connects
+  // Load blockchain data and network info when wallet connects
   React.useEffect(() => {
     if (address) {
       getBlockchainTotals(address).then(setTotals);
+      getNetworkInfo().then(setNetworkInfo);
     }
   }, [address]);
 
@@ -96,6 +104,27 @@ export default function ProfilePage() {
         </div>
       </div>
 
+      {/* Network Status */}
+      {networkInfo && (
+        <div>
+          <h3 style={{ marginBottom: 12 }}>🌐 Network Status</h3>
+          <div style={{
+            background: networkInfo.isCorrectNetwork ? "#d4edda" : "#f8d7da",
+            border: networkInfo.isCorrectNetwork ? "1px solid #c3e6cb" : "1px solid #f5c6cb",
+            padding: 12, borderRadius: 12, fontSize: 14
+          }}>
+            <div style={{ fontWeight: 600, marginBottom: 4 }}>
+              Connected to: {networkInfo.chainName}
+            </div>
+            {!networkInfo.isCorrectNetwork && (
+              <div style={{ color: "#721c24" }}>
+                ⚠️ Please switch to {networkInfo.expectedChainName} to use the app
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* Demo Tip Section */}
       <div>
         <h3 style={{ marginBottom: 12 }}>💙 Demo Tipping</h3>
@@ -112,6 +141,21 @@ export default function ProfilePage() {
             recipientAddress={address} 
             recipientName="yourself (demo)" 
           />
+        </div>
+      </div>
+
+      {/* Debug Information */}
+      <div>
+        <h3 style={{ marginBottom: 12 }}>🔧 Debug Information</h3>
+        <div style={{
+          background: "#f8f9fa", padding: 12, borderRadius: 12, border: "1px solid #dee2e6",
+          fontSize: 12, fontFamily: "monospace"
+        }}>
+          <div><strong>Contract Address:</strong> {getDebugInfo().contractAddress}</div>
+          <div><strong>Expected Network:</strong> {getDebugInfo().expectedChainName} ({getDebugInfo().expectedChainId})</div>
+          <div><strong>Current Network:</strong> {networkInfo?.chainName} ({networkInfo?.chainId})</div>
+          <div><strong>Network Status:</strong> {networkInfo?.isCorrectNetwork ? '✅ Correct' : '❌ Wrong'}</div>
+          <div><strong>Explorer:</strong> <a href={getDebugInfo().explorerUrl} target="_blank" rel="noopener noreferrer" style={{ color: "#0066cc" }}>{getDebugInfo().explorerUrl}</a></div>
         </div>
       </div>
     </div>
