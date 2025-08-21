@@ -30,7 +30,7 @@ export type LeaderboardEntry = {
 };
 
 /**
- * Fetch leaderboard data from BaseScan API
+ * Fetch leaderboard data from BaseScan API or direct RPC
  */
 export async function fetchLeaderboardData(): Promise<LeaderboardEntry[]> {
   if (!CONTRACT_ADDRESS) {
@@ -38,36 +38,95 @@ export async function fetchLeaderboardData(): Promise<LeaderboardEntry[]> {
     return [];
   }
 
+  // First try BaseScan API (requires valid BaseScan API key)
+  if (BASESCAN_API_KEY) {
+    try {
+      console.log('Trying BaseScan API with API key...');
+      const baseUrl = 'https://api.basescan.org/api';
+      const params = new URLSearchParams({
+        module: 'logs',
+        action: 'getLogs',
+        address: CONTRACT_ADDRESS,
+        topic0: TRANSFER_SINGLE_TOPIC,
+        fromBlock: 'earliest',
+        toBlock: 'latest',
+        page: '1',
+        offset: '1000',
+        apikey: BASESCAN_API_KEY
+      });
+
+      const response = await fetch(`${baseUrl}?${params}`);
+      const data = await response.json();
+
+      console.log('BaseScan API response:', {
+        status: data.status,
+        message: data.message,
+        resultCount: data.result?.length || 0
+      });
+
+      if (data.status === '1' && data.result) {
+        console.log('Successfully fetched data from BaseScan API');
+        return parseEventLogs(data.result);
+      } else {
+        console.warn('BaseScan API failed:', data.message);
+        if (data.result && data.result.includes('API Key')) {
+          console.error('BaseScan API Key issue. Note: Etherscan API keys do not work with BaseScan.');
+          console.error('Get a BaseScan API key from: https://basescan.org/apis');
+        }
+      }
+    } catch (error) {
+      console.error('BaseScan API request failed:', error);
+    }
+  }
+
+  // Fallback: Try direct RPC call (limited but might work for recent events)
   try {
-    // Construct BaseScan API URL for recent TransferSingle events
-    const baseUrl = 'https://api.basescan.org/api';
-    const params = new URLSearchParams({
-      module: 'logs',
-      action: 'getLogs',
-      address: CONTRACT_ADDRESS,
-      topic0: TRANSFER_SINGLE_TOPIC,
-      fromBlock: 'earliest',
-      toBlock: 'latest',
-      page: '1',
-      offset: '1000'
+    console.log('Trying direct RPC call as fallback...');
+    const rpcUrl = 'https://mainnet.base.org';
+    
+    const response = await fetch(rpcUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        jsonrpc: '2.0',
+        method: 'eth_getLogs',
+        params: [{
+          address: CONTRACT_ADDRESS,
+          topics: [TRANSFER_SINGLE_TOPIC],
+          fromBlock: '0x0', // From genesis
+          toBlock: 'latest'
+        }],
+        id: 1
+      })
     });
 
-    if (BASESCAN_API_KEY) {
-      params.append('apikey', BASESCAN_API_KEY);
-    }
-
-    const response = await fetch(`${baseUrl}?${params}`);
     const data = await response.json();
-
-    if (data.status !== '1' || !data.result) {
-      console.warn('BaseScan API error:', data.message);
-      return getFallbackLeaderboard();
+    
+    if (data.result && Array.isArray(data.result)) {
+      console.log('Successfully fetched data from RPC:', data.result.length, 'events');
+      return parseEventLogs(data.result);
+    } else {
+      console.warn('RPC call failed:', data.error);
     }
+  } catch (error) {
+    console.error('RPC call failed:', error);
+  }
 
+  console.log('All data fetching methods failed, using fallback data');
+  return getFallbackLeaderboard();
+}
+
+/**
+ * Parse event logs into leaderboard entries
+ */
+function parseEventLogs(logs: any[]): LeaderboardEntry[] {
+  try {
     // Parse events and aggregate by user
     const userStats: Record<string, LeaderboardEntry> = {};
+    let processedEvents = 0;
+    let skippedEvents = 0;
 
-    for (const log of data.result) {
+    for (const log of logs) {
       try {
         // Parse TransferSingle event data
         // topics[1] = operator, topics[2] = from, topics[3] = to
@@ -77,19 +136,32 @@ export async function fetchLeaderboardData(): Promise<LeaderboardEntry[]> {
         const toAddress = log.topics[3];
         
         // Only count mints (from zero address)
-        if (fromAddress !== '0x0000000000000000000000000000000000000000000000000000000000000000') {
+        // Topics are 32 bytes (64 hex chars) padded, zero address should be all zeros
+        const zeroAddressTopic = '0x0000000000000000000000000000000000000000000000000000000000000000';
+        if (fromAddress !== zeroAddressTopic) {
+          console.log('Skipping non-mint event, from:', fromAddress);
+          skippedEvents++;
           continue;
         }
 
         // Extract recipient address (remove padding)
-        const recipient = '0x' + toAddress.slice(-40);
+        const recipient = ('0x' + toAddress.slice(-40)).toLowerCase();
         
         // Parse token ID from data (first 32 bytes)
         const tokenIdHex = log.data.slice(2, 66);
         const tokenId = parseInt(tokenIdHex, 16);
         
+        console.log('Processing mint event:', {
+          recipient,
+          tokenId,
+          blockNumber: log.blockNumber,
+          transactionHash: log.transactionHash
+        });
+        
         // Skip if invalid token ID
         if (tokenId < 1 || tokenId > 4) {
+          console.warn('Invalid token ID:', tokenId);
+          skippedEvents++;
           continue;
         }
 
@@ -114,8 +186,11 @@ export async function fetchLeaderboardData(): Promise<LeaderboardEntry[]> {
           case 3: userStats[recipient].contributions.pace++; break;
           case 4: userStats[recipient].contributions.supplies++; break;
         }
+        
+        processedEvents++;
       } catch (error) {
         console.warn('Error parsing log:', error, log);
+        skippedEvents++;
       }
     }
 
@@ -124,11 +199,23 @@ export async function fetchLeaderboardData(): Promise<LeaderboardEntry[]> {
       .filter(entry => entry.points > 0)
       .sort((a, b) => b.points - a.points);
 
-    console.log('Leaderboard data loaded:', leaderboard.length, 'entries');
+    console.log('Leaderboard processing complete:', {
+      totalLogs: logs.length,
+      processedEvents,
+      skippedEvents,
+      uniqueUsers: Object.keys(userStats).length,
+      leaderboardEntries: leaderboard.length
+    });
+
+    // Log each user's stats for debugging
+    Object.values(userStats).forEach(user => {
+      console.log(`User ${user.address}: ${user.points} points`, user.contributions);
+    });
+
     return leaderboard;
 
   } catch (error) {
-    console.error('Failed to fetch leaderboard data:', error);
+    console.error('Failed to parse event logs:', error);
     return getFallbackLeaderboard();
   }
 }
@@ -183,13 +270,23 @@ export async function getCachedLeaderboardData(): Promise<LeaderboardEntry[]> {
   const now = Date.now();
   
   if (cachedData && (now - cachedData.timestamp) < CACHE_DURATION) {
+    console.log('Using cached leaderboard data');
     return cachedData.data;
   }
 
+  console.log('Fetching fresh leaderboard data');
   const data = await fetchLeaderboardData();
   cachedData = { data, timestamp: now };
   
   return data;
+}
+
+/**
+ * Clear the leaderboard cache (for debugging)
+ */
+export function clearLeaderboardCache(): void {
+  console.log('Clearing leaderboard cache');
+  cachedData = null;
 }
 
 /**
