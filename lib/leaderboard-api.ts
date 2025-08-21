@@ -2,7 +2,7 @@
 
 // Contract configuration
 const CONTRACT_ADDRESS = process.env.NEXT_PUBLIC_CONTRACT_ADDRESS as `0x${string}`;
-const BASESCAN_API_KEY = process.env.NEXT_PUBLIC_BASESCAN_API_KEY;
+const ETHERSCAN_API_KEY = process.env.NEXT_PUBLIC_ETHERSCAN_API_KEY;
 
 // ERC-1155 TransferSingle event signature
 const TRANSFER_SINGLE_TOPIC = '0xc3d58168c5ae7397731d063d5bbf3d657854427343f4c083240f7aacaa2d0f62';
@@ -30,7 +30,7 @@ export type LeaderboardEntry = {
 };
 
 /**
- * Fetch leaderboard data from BaseScan API or direct RPC
+ * Fetch leaderboard data from Etherscan API or direct RPC
  */
 export async function fetchLeaderboardData(): Promise<LeaderboardEntry[]> {
   if (!CONTRACT_ADDRESS) {
@@ -38,44 +38,30 @@ export async function fetchLeaderboardData(): Promise<LeaderboardEntry[]> {
     return [];
   }
 
-  // First try BaseScan API (requires valid BaseScan API key)
-  if (BASESCAN_API_KEY) {
+  // First try Etherscan API for Base network
+  if (ETHERSCAN_API_KEY) {
     try {
-      console.log('Trying BaseScan API with API key...');
-      const baseUrl = 'https://api.basescan.org/api';
-      const params = new URLSearchParams({
-        module: 'logs',
-        action: 'getLogs',
-        address: CONTRACT_ADDRESS,
-        topic0: TRANSFER_SINGLE_TOPIC,
-        fromBlock: 'earliest',
-        toBlock: 'latest',
-        page: '1',
-        offset: '1000',
-        apikey: BASESCAN_API_KEY
-      });
+      console.log('Trying Etherscan v2 API for Base network...');
+      // Etherscan v2 API requires chainid as first parameter, not in URLSearchParams
+      const apiUrl = `https://api.etherscan.io/v2/api?chainid=8453&module=logs&action=getLogs&address=${CONTRACT_ADDRESS}&topic0=${TRANSFER_SINGLE_TOPIC}&fromBlock=earliest&toBlock=latest&page=1&offset=1000&apikey=${ETHERSCAN_API_KEY}`;
 
-      const response = await fetch(`${baseUrl}?${params}`);
+      const response = await fetch(apiUrl);
       const data = await response.json();
 
-      console.log('BaseScan API response:', {
+      console.log('Etherscan API response:', {
         status: data.status,
         message: data.message,
         resultCount: data.result?.length || 0
       });
 
       if (data.status === '1' && data.result) {
-        console.log('Successfully fetched data from BaseScan API');
+        console.log('Successfully fetched data from Etherscan API');
         return parseEventLogs(data.result);
       } else {
-        console.warn('BaseScan API failed:', data.message);
-        if (data.result && data.result.includes('API Key')) {
-          console.error('BaseScan API Key issue. Note: Etherscan API keys do not work with BaseScan.');
-          console.error('Get a BaseScan API key from: https://basescan.org/apis');
-        }
+        console.warn('Etherscan API failed:', data.message);
       }
     } catch (error) {
-      console.error('BaseScan API request failed:', error);
+      console.error('Etherscan API request failed:', error);
     }
   }
 
@@ -116,10 +102,18 @@ export async function fetchLeaderboardData(): Promise<LeaderboardEntry[]> {
   return getFallbackLeaderboard();
 }
 
+// Type for blockchain event log
+type EventLog = {
+  topics: string[];
+  data: string;
+  blockNumber?: string;
+  transactionHash?: string;
+};
+
 /**
  * Parse event logs into leaderboard entries
  */
-function parseEventLogs(logs: any[]): LeaderboardEntry[] {
+function parseEventLogs(logs: EventLog[]): LeaderboardEntry[] {
   try {
     // Parse events and aggregate by user
     const userStats: Record<string, LeaderboardEntry> = {};
@@ -351,7 +345,7 @@ export async function getEnhancedLeaderboardData(currentUserAddress?: string): P
 export function getLeaderboardDebugInfo() {
   return {
     contractAddress: CONTRACT_ADDRESS,
-    hasApiKey: !!BASESCAN_API_KEY,
+    hasApiKey: !!ETHERSCAN_API_KEY,
     transferSingleTopic: TRANSFER_SINGLE_TOPIC,
     pointValues: POINT_VALUES,
     cacheStatus: cachedData ? {
