@@ -1,7 +1,7 @@
 "use client";
 
 import { createPublicClient, createWalletClient, custom, parseEther } from 'viem';
-import { baseSepolia } from 'viem/chains';
+import { base } from 'viem/chains';
 import ContributionBadgesABI from './ContributionBadges.json';
 
 // Contract configuration
@@ -14,8 +14,8 @@ const CONTRIBUTION_TYPES = {
 } as const;
 
 // Network configuration
-const EXPECTED_CHAIN = baseSepolia; // Base Sepolia testnet
-const EXPECTED_CHAIN_ID = 84532;
+const EXPECTED_CHAIN = base; // Base Mainnet
+const EXPECTED_CHAIN_ID = 8453;
 
 // Types
 export type ContributionType = keyof typeof CONTRIBUTION_TYPES;
@@ -100,7 +100,7 @@ export async function makeBlockchainContribution(type: ContributionType): Promis
   const currentChainId = parseInt(chainId, 16);
   
   if (currentChainId !== EXPECTED_CHAIN_ID) {
-    throw new Error(`Wrong network. Please switch to Base Sepolia testnet (Chain ID: ${EXPECTED_CHAIN_ID}). Currently on Chain ID: ${currentChainId}`);
+    throw new Error(`Wrong network. Please switch to Base Mainnet (Chain ID: ${EXPECTED_CHAIN_ID}). Currently on Chain ID: ${currentChainId}`);
   }
 
   const publicClient = createPublicClient({
@@ -139,7 +139,7 @@ export async function makeBlockchainContribution(type: ContributionType): Promis
 
   console.log('Transaction confirmed:', receipt);
 
-  const explorerUrl = `https://sepolia.basescan.org/tx/${hash}`;
+  const explorerUrl = `https://basescan.org/tx/${hash}`;
   
   return { hash, explorerUrl };
 }
@@ -166,7 +166,7 @@ export async function sendBlockchainTip(
   const currentChainId = parseInt(chainId, 16);
   
   if (currentChainId !== EXPECTED_CHAIN_ID) {
-    throw new Error(`Wrong network. Please switch to Base Sepolia testnet (Chain ID: ${EXPECTED_CHAIN_ID}). Currently on Chain ID: ${currentChainId}`);
+    throw new Error(`Wrong network. Please switch to Base Mainnet (Chain ID: ${EXPECTED_CHAIN_ID}). Currently on Chain ID: ${currentChainId}`);
   }
 
   const publicClient = createPublicClient({
@@ -206,7 +206,7 @@ export async function sendBlockchainTip(
 
   console.log('Tip transaction confirmed:', receipt);
 
-  const explorerUrl = `https://sepolia.basescan.org/tx/${hash}`;
+  const explorerUrl = `https://basescan.org/tx/${hash}`;
   
   return { hash, explorerUrl };
 }
@@ -275,7 +275,7 @@ export async function getNetworkInfo(): Promise<{
       chainName: 'No wallet',
       isCorrectNetwork: false,
       expectedChainId: EXPECTED_CHAIN_ID,
-      expectedChainName: 'Base Sepolia'
+      expectedChainName: 'Base Mainnet'
     };
   }
 
@@ -295,7 +295,7 @@ export async function getNetworkInfo(): Promise<{
       chainName: chainNames[currentChainId] || `Chain ${currentChainId}`,
       isCorrectNetwork: currentChainId === EXPECTED_CHAIN_ID,
       expectedChainId: EXPECTED_CHAIN_ID,
-      expectedChainName: 'Base Sepolia'
+      expectedChainName: 'Base Mainnet'
     };
   } catch (error) {
     console.error('Failed to get network info:', error);
@@ -304,7 +304,7 @@ export async function getNetworkInfo(): Promise<{
       chainName: 'Unknown',
       isCorrectNetwork: false,
       expectedChainId: EXPECTED_CHAIN_ID,
-      expectedChainName: 'Base Sepolia'
+      expectedChainName: 'Base Mainnet'
     };
   }
 }
@@ -323,7 +323,7 @@ export function getDebugInfo() {
   return {
     contractAddress: CONTRACT_ADDRESS,
     expectedChainId: EXPECTED_CHAIN_ID,
-    expectedChainName: 'Base Sepolia',
-    explorerUrl: 'https://sepolia.basescan.org'
+    expectedChainName: 'Base Mainnet',
+    explorerUrl: 'https://basescan.org'
   };
 }

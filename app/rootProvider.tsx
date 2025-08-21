@@ -20,7 +20,7 @@ export function RootProvider({ children }: { children: ReactNode }) {
       }}
       miniKit={{
         enabled: true,
-        autoConnect: true,
+        autoConnect: false, // Temporarily disabled to prevent paymaster issues during deployment
         notificationProxyUrl: undefined,
       }}
     >
