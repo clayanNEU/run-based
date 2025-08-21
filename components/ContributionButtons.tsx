@@ -4,11 +4,12 @@ import * as React from "react";
 import { useAccount } from 'wagmi';
 import { 
   getBlockchainTotals, 
-  makeBlockchainContribution, 
+  makeContributionWithSponsorship, 
   getSuccessMessage,
   getPointsForType,
   getNetworkInfo,
   getDebugInfo,
+  getPaymasterStatus,
   type ContributionType,
   type BlockchainTotals 
 } from "../lib/blockchain-store";
@@ -40,7 +41,8 @@ export default function ContributionButtons() {
     expectedChainName: string;
   } | null>(null);
   const [showDebug, setShowDebug] = React.useState(false);
-  const [lastTransaction, setLastTransaction] = React.useState<{ hash: string; explorerUrl: string } | null>(null);
+  const [lastTransaction, setLastTransaction] = React.useState<{ hash: string; explorerUrl: string; sponsored?: boolean; fallbackReason?: string } | null>(null);
+  const [paymasterStatus, setPaymasterStatus] = React.useState<{ available: boolean; walletSupported: boolean; configured: boolean } | null>(null);
   const appUrl = process.env.NEXT_PUBLIC_URL || "https://run-based.vercel.app";
 
   // Load blockchain data and network info when wallet connects
@@ -48,6 +50,7 @@ export default function ContributionButtons() {
     if (address) {
       getBlockchainTotals(address).then(setTotals);
       getNetworkInfo().then(setNetworkInfo);
+      getPaymasterStatus().then(setPaymasterStatus);
     }
   }, [address]);
 
@@ -72,15 +75,32 @@ export default function ContributionButtons() {
     setLastTransaction(null);
     
     try {
-      // Show transaction submitted message
-      setToast("Transaction submitted... ⏳");
+      // Check paymaster status and show appropriate message
+      const currentPaymasterStatus = await getPaymasterStatus();
+      setPaymasterStatus(currentPaymasterStatus);
       
-      // Make blockchain transaction and wait for confirmation
-      const result = await makeBlockchainContribution(key);
+      if (currentPaymasterStatus.available) {
+        setToast("Attempting gas-free transaction... ⚡");
+      } else {
+        setToast("Transaction submitted... ⏳");
+      }
+      
+      // Make blockchain transaction with sponsorship attempt and wait for confirmation
+      const result = await makeContributionWithSponsorship(key);
       setLastTransaction(result);
       
-      // Show transaction hash briefly
-      setToast(`Transaction confirmed! Hash: ${result.hash.slice(0, 10)}...`);
+      // Show appropriate success message based on sponsorship status
+      if (result.sponsored) {
+        setToast(`✅ Gas-free transaction confirmed! Hash: ${result.hash.slice(0, 10)}...`);
+      } else {
+        setToast(`✅ Transaction confirmed! Hash: ${result.hash.slice(0, 10)}...`);
+        if (result.fallbackReason) {
+          setTimeout(() => {
+            setToast(`ℹ️ ${result.fallbackReason}`);
+            setTimeout(() => setToast(null), 3000);
+          }, 2000);
+        }
+      }
       
       // Optimistic UI update - immediately update points and badge count
       const points = getPointsForType(key);
@@ -104,7 +124,8 @@ export default function ContributionButtons() {
       
       // Show success message immediately
       const msg = getSuccessMessage(key);
-      setToast(`${msg} + Badge earned! 🎉`);
+      const sponsorshipEmoji = result.sponsored ? "⚡" : "🎉";
+      setToast(`${msg} + Badge earned! ${sponsorshipEmoji}`);
       setShareReady({ title: `${msg} - Badge earned!` });
       
       // Refresh from blockchain after a delay to ensure consistency
@@ -213,6 +234,26 @@ export default function ContributionButtons() {
         <div><strong>Points</strong><div>{totals.points}</div></div>
         <div><strong>Streak</strong><div>{totals.streak || 0} 🔥</div></div>
       </div>
+
+      {/* Paymaster Status */}
+      {paymasterStatus && (
+        <div style={{
+          background: paymasterStatus.available ? "#d1ecf1" : "#f8d7da",
+          border: paymasterStatus.available ? "1px solid #bee5eb" : "1px solid #f5c6cb",
+          padding: 12, borderRadius: 12, fontSize: 14
+        }}>
+          <div style={{ fontWeight: 600, marginBottom: 4 }}>
+            {paymasterStatus.available ? "⚡ Gas Sponsorship Active" : "💰 Gas Fees Required"}
+          </div>
+          <div style={{ fontSize: 12, color: "#666" }}>
+            {paymasterStatus.available 
+              ? "Your transactions are sponsored by Base team!" 
+              : paymasterStatus.configured 
+                ? "Wallet doesn't support gas sponsorship" 
+                : "Paymaster not configured"}
+          </div>
+        </div>
+      )}
 
       {/* Network Status */}
       {networkInfo && (

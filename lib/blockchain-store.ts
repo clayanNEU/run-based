@@ -3,6 +3,14 @@
 import { createPublicClient, createWalletClient, custom, parseEther } from 'viem';
 import { base } from 'viem/chains';
 import ContributionBadgesABI from './ContributionBadges.json';
+import { 
+  makeContributionSponsored, 
+  sendTipSponsored, 
+  PaymasterError, 
+  parsePaymasterError,
+  isPaymasterAvailable,
+  checkPaymasterSupport
+} from './paymaster-client';
 
 // Contract configuration
 const CONTRACT_ADDRESS = process.env.NEXT_PUBLIC_CONTRACT_ADDRESS as `0x${string}`;
@@ -83,7 +91,111 @@ export async function getBlockchainTotals(userAddress?: string): Promise<Blockch
 }
 
 /**
- * Make contribution on blockchain with proper transaction handling
+ * Make contribution with sponsored transaction first, fallback to regular
+ */
+export async function makeContributionWithSponsorship(type: ContributionType): Promise<{ 
+  hash: string; 
+  explorerUrl: string; 
+  sponsored: boolean;
+  fallbackReason?: string;
+}> {
+  // Try sponsored transaction first if paymaster is available
+  if (isPaymasterAvailable()) {
+    try {
+      console.log('Attempting sponsored contribution...');
+      const result = await makeContributionSponsored(type);
+      console.log('✅ Sponsored contribution successful!');
+      return { ...result, sponsored: true };
+    } catch (error) {
+      if (error instanceof PaymasterError) {
+        const fallbackReason = parsePaymasterError(error);
+        console.log('⚠️ Sponsored transaction failed, falling back to regular transaction:', fallbackReason);
+        
+        try {
+          const result = await makeBlockchainContribution(type);
+          return { ...result, sponsored: false, fallbackReason };
+        } catch (fallbackError) {
+          console.error('❌ Fallback transaction also failed:', fallbackError);
+          throw fallbackError;
+        }
+      } else {
+        console.error('❌ Sponsored transaction failed with non-paymaster error:', error);
+        throw error;
+      }
+    }
+  }
+
+  // Use regular transaction if paymaster not available
+  console.log('Using regular transaction (paymaster not available)');
+  const result = await makeBlockchainContribution(type);
+  return { ...result, sponsored: false, fallbackReason: 'Paymaster not configured' };
+}
+
+/**
+ * Send tip with sponsored transaction first, fallback to regular
+ */
+export async function sendTipWithSponsorship(
+  recipientAddress: string, 
+  amount: string, 
+  message: string
+): Promise<{ 
+  hash: string; 
+  explorerUrl: string; 
+  sponsored: boolean;
+  fallbackReason?: string;
+}> {
+  // Try sponsored transaction first if paymaster is available
+  if (isPaymasterAvailable()) {
+    try {
+      console.log('Attempting sponsored tip...');
+      const result = await sendTipSponsored(recipientAddress, amount, message);
+      console.log('✅ Sponsored tip successful!');
+      return { ...result, sponsored: true };
+    } catch (error) {
+      if (error instanceof PaymasterError) {
+        const fallbackReason = parsePaymasterError(error);
+        console.log('⚠️ Sponsored tip failed, falling back to regular transaction:', fallbackReason);
+        
+        try {
+          const result = await sendBlockchainTip(recipientAddress, amount, message);
+          return { ...result, sponsored: false, fallbackReason };
+        } catch (fallbackError) {
+          console.error('❌ Fallback tip also failed:', fallbackError);
+          throw fallbackError;
+        }
+      } else {
+        console.error('❌ Sponsored tip failed with non-paymaster error:', error);
+        throw error;
+      }
+    }
+  }
+
+  // Use regular transaction if paymaster not available
+  console.log('Using regular tip transaction (paymaster not available)');
+  const result = await sendBlockchainTip(recipientAddress, amount, message);
+  return { ...result, sponsored: false, fallbackReason: 'Paymaster not configured' };
+}
+
+/**
+ * Check if paymaster is supported by the current wallet
+ */
+export async function getPaymasterStatus(): Promise<{
+  available: boolean;
+  walletSupported: boolean;
+  configured: boolean;
+}> {
+  const configured = isPaymasterAvailable();
+  const walletSupported = configured ? await checkPaymasterSupport() : false;
+  
+  return {
+    available: configured && walletSupported,
+    walletSupported,
+    configured
+  };
+}
+
+/**
+ * Make contribution on blockchain with proper transaction handling (original function)
  */
 export async function makeBlockchainContribution(type: ContributionType): Promise<{ hash: string; explorerUrl: string }> {
   if (!CONTRACT_ADDRESS) {

@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { useAccount } from 'wagmi';
-import { sendBlockchainTip } from "../lib/blockchain-store";
+import { sendTipWithSponsorship, getPaymasterStatus } from "../lib/blockchain-store";
 
 interface TipButtonProps {
   recipientAddress: string;
@@ -15,6 +15,14 @@ export default function TipButton({ recipientAddress, recipientName = "contribut
   const [message, setMessage] = React.useState("");
   const [loading, setLoading] = React.useState(false);
   const [toast, setToast] = React.useState<string | null>(null);
+  const [paymasterStatus, setPaymasterStatus] = React.useState<{ available: boolean; walletSupported: boolean; configured: boolean } | null>(null);
+
+  // Load paymaster status when component mounts
+  React.useEffect(() => {
+    if (address) {
+      getPaymasterStatus().then(setPaymasterStatus);
+    }
+  }, [address]);
 
   async function handleTip() {
     if (!address) {
@@ -32,13 +40,35 @@ export default function TipButton({ recipientAddress, recipientName = "contribut
     setLoading(true);
     
     try {
-      await sendBlockchainTip(
+      // Check paymaster status and show appropriate message
+      const currentPaymasterStatus = await getPaymasterStatus();
+      setPaymasterStatus(currentPaymasterStatus);
+      
+      if (currentPaymasterStatus.available) {
+        setToast("Sending gas-free tip... ⚡");
+      } else {
+        setToast("Sending tip... ⏳");
+      }
+      
+      // Send tip with sponsorship attempt
+      const result = await sendTipWithSponsorship(
         recipientAddress, 
         amount, 
         message || `Great contribution, ${recipientName}! 🏃‍♀️`
       );
       
-      setToast(`Tip sent! 💙 ${amount} ETH to ${recipientName}`);
+      // Show appropriate success message based on sponsorship status
+      const sponsorshipEmoji = result.sponsored ? "⚡" : "💙";
+      setToast(`Tip sent! ${sponsorshipEmoji} ${amount} ETH to ${recipientName}`);
+      
+      // Show fallback reason if applicable
+      if (!result.sponsored && result.fallbackReason) {
+        setTimeout(() => {
+          setToast(`ℹ️ ${result.fallbackReason}`);
+          setTimeout(() => setToast(null), 3000);
+        }, 2000);
+      }
+      
       setMessage("");
     } catch (error: unknown) {
       console.error('Tip failed:', error);
@@ -68,6 +98,9 @@ export default function TipButton({ recipientAddress, recipientName = "contribut
     <div style={{ padding: 12, background: "#f0f8ff", borderRadius: 8, marginTop: 8 }}>
       <div style={{ fontSize: 14, marginBottom: 8, fontWeight: 600 }}>
         💙 Appreciate {recipientName}
+        {paymasterStatus?.available && (
+          <span style={{ fontSize: 12, color: "#007bff", marginLeft: 8 }}>⚡ Gas-free</span>
+        )}
       </div>
       
       <div style={{ display: "flex", gap: 8, marginBottom: 8 }}>
