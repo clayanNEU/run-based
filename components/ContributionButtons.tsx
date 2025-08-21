@@ -59,17 +59,18 @@ export default function ContributionButtons() {
       const msg = getSuccessMessage(key);
       setToast(`${msg} + NFT minted! 🎉`);
       setShareReady({ title: msg });
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Transaction failed:', error);
       let errorMessage = "Transaction failed";
       
       // Parse common error messages
-      if (error.message?.includes("Already contributed this type today")) {
+      const errorObj = error as { message?: string; shortMessage?: string };
+      if (errorObj.message?.includes("Already contributed this type today")) {
         errorMessage = "Already contributed today ✅";
-      } else if (error.message?.includes("User rejected")) {
+      } else if (errorObj.message?.includes("User rejected")) {
         errorMessage = "Transaction cancelled";
-      } else if (error.shortMessage) {
-        errorMessage = error.shortMessage;
+      } else if (errorObj.shortMessage) {
+        errorMessage = errorObj.shortMessage;
       }
       
       setToast(errorMessage);

@@ -1,7 +1,7 @@
 "use client";
 
-import { readContract, writeContract } from '@wagmi/core';
-import { parseEther } from 'viem';
+import { createPublicClient, createWalletClient, custom, parseEther } from 'viem';
+import { base } from 'viem/chains';
 import ContributionBadgesABI from './ContributionBadges.json';
 
 // Contract configuration
@@ -44,12 +44,22 @@ export async function getBlockchainTotals(userAddress?: string): Promise<Blockch
   }
   
   try {
-    const [contributions, stats, badges] = await readContract({
+    const ethereum = (window as { ethereum?: { request: (args: { method: string; params?: unknown[] }) => Promise<unknown> } }).ethereum;
+    if (!ethereum) {
+      throw new Error('No ethereum provider found');
+    }
+
+    const publicClient = createPublicClient({
+      chain: base,
+      transport: custom(ethereum)
+    });
+
+    const [contributions, stats, badges] = await publicClient.readContract({
       address: CONTRACT_ADDRESS,
       abi: ContributionBadgesABI,
       functionName: 'getUserData',
       args: [userAddress]
-    }) as [bigint[], any, string[]];
+    }) as [bigint[], { totalPoints: bigint; currentStreak: bigint; totalTipsReceived: bigint; totalTipsSent: bigint }, string[]];
     
     return {
       attend: Number(contributions[0]),
@@ -76,11 +86,27 @@ export async function makeBlockchainContribution(type: ContributionType): Promis
     throw new Error('Contract address not configured');
   }
 
-  await writeContract({
+  const ethereum = (window as { ethereum?: { request: (args: { method: string; params?: unknown[] }) => Promise<unknown> } }).ethereum;
+  if (!ethereum) {
+    throw new Error('No ethereum provider found');
+  }
+
+  const walletClient = createWalletClient({
+    chain: base,
+    transport: custom(ethereum)
+  });
+
+  const [account] = await ethereum.request({ method: 'eth_accounts' }) as string[];
+  if (!account) {
+    throw new Error('No account connected');
+  }
+
+  await walletClient.writeContract({
     address: CONTRACT_ADDRESS,
     abi: ContributionBadgesABI,
     functionName: 'makeContribution',
-    args: [CONTRIBUTION_TYPES[type]]
+    args: [CONTRIBUTION_TYPES[type]],
+    account: account as `0x${string}`
   });
 }
 
@@ -96,12 +122,28 @@ export async function sendBlockchainTip(
     throw new Error('Contract address not configured');
   }
 
-  await writeContract({
+  const ethereum = (window as { ethereum?: { request: (args: { method: string; params?: unknown[] }) => Promise<unknown> } }).ethereum;
+  if (!ethereum) {
+    throw new Error('No ethereum provider found');
+  }
+
+  const walletClient = createWalletClient({
+    chain: base,
+    transport: custom(ethereum)
+  });
+
+  const [account] = await ethereum.request({ method: 'eth_accounts' }) as string[];
+  if (!account) {
+    throw new Error('No account connected');
+  }
+
+  await walletClient.writeContract({
     address: CONTRACT_ADDRESS,
     abi: ContributionBadgesABI,
     functionName: 'tipContributor',
     args: [recipientAddress, message],
-    value: parseEther(amount)
+    value: parseEther(amount),
+    account: account as `0x${string}`
   });
 }
 
@@ -109,8 +151,8 @@ export async function sendBlockchainTip(
  * Check if user can contribute today (simplified - let contract handle validation)
  */
 export async function canMakeContribution(
-  type: ContributionType, 
-  userAddress: string
+  _type: ContributionType, 
+  _userAddress: string
 ): Promise<{ ok: boolean; reason?: string }> {
   // For simplicity, let the contract handle the validation
   // The contract will revert with a clear error message if not allowed
