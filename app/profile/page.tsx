@@ -61,14 +61,24 @@ export default function ProfilePage() {
         </div>
       </div>
 
-      {/* NFT Collection */}
+      {/* Badge Collection */}
       <div>
-        <h3 style={{ marginBottom: 12 }}>🏆 NFT Collection</h3>
+        <h3 style={{ marginBottom: 12 }}>🏆 Badge Collection</h3>
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
-          <NFTBadge emoji="✅" label="Attend" count={totals.attend} />
-          <NFTBadge emoji="🏁" label="Host" count={totals.host} />
-          <NFTBadge emoji="⏱️" label="Pace" count={totals.pace} />
-          <NFTBadge emoji="🧃" label="Supplies" count={totals.supplies} />
+          <BadgeCard emoji="✅" label="Attend" count={totals.attend} />
+          <BadgeCard emoji="🏁" label="Host" count={totals.host} />
+          <BadgeCard emoji="⏱️" label="Pace" count={totals.pace} />
+          <BadgeCard emoji="🧃" label="Supplies" count={totals.supplies} />
+        </div>
+        <div style={{ 
+          fontSize: 12, 
+          color: "#888", 
+          marginTop: 8,
+          textAlign: "center"
+        }}>
+          <span title="Your badges are permanently stored onchain on Base network">
+            ⓘ Badges are onchain & permanent on Base
+          </span>
         </div>
       </div>
 
@@ -162,7 +172,7 @@ export default function ProfilePage() {
   );
 }
 
-function NFTBadge({ emoji, label, count }: { emoji: string; label: string; count: number }) {
+function BadgeCard({ emoji, label, count }: { emoji: string; label: string; count: number }) {
   return (
     <div style={{ 
       border: "1px solid #e8e8e8", 
@@ -173,7 +183,7 @@ function NFTBadge({ emoji, label, count }: { emoji: string; label: string; count
     }}>
       <div style={{ fontSize: 24, marginBottom: 4 }}>{emoji}</div>
       <div style={{ fontWeight: 700, fontSize: 18, marginBottom: 2 }}>{count}</div>
-      <div style={{ fontSize: 12, color: "#777" }}>{label} NFTs</div>
+      <div style={{ fontSize: 12, color: "#777" }}>{label} Badges</div>
     </div>
   );
 }

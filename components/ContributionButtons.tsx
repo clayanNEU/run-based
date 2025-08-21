@@ -82,17 +82,38 @@ export default function ContributionButtons() {
       // Show transaction hash briefly
       setToast(`Transaction confirmed! Hash: ${result.hash.slice(0, 10)}...`);
       
-      // Wait a moment then refresh data from blockchain
+      // Optimistic UI update - immediately update points and badge count
+      const points = getPointsForType(key);
+      const optimisticTotals = { ...totals };
+      optimisticTotals.points += points;
+      
+      // Update contribution counts
+      switch (key) {
+        case 'ATTEND': optimisticTotals.attend += 1; break;
+        case 'HOST': optimisticTotals.host += 1; break;
+        case 'PACE': optimisticTotals.pace += 1; break;
+        case 'SUPPLIES': optimisticTotals.supplies += 1; break;
+      }
+      
+      // Update streak for attendance
+      if (key === 'ATTEND') {
+        optimisticTotals.streak += 1;
+      }
+      
+      setTotals(optimisticTotals);
+      
+      // Show success message immediately
+      const msg = getSuccessMessage(key);
+      setToast(`${msg} + Badge earned! 🎉`);
+      setShareReady({ title: `${msg} - Badge earned!` });
+      
+      // Refresh from blockchain after a delay to ensure consistency
       setTimeout(async () => {
         const newTotals = await getBlockchainTotals(address);
         setTotals(newTotals);
-        
-        const msg = getSuccessMessage(key);
-        setToast(`${msg} + NFT minted! 🎉`);
-        setShareReady({ title: msg });
-        
-        setTimeout(() => setToast(null), 3000);
-      }, 1000);
+      }, 2000);
+      
+      setTimeout(() => setToast(null), 3000);
       
     } catch (error: unknown) {
       console.error('Transaction failed:', error);
