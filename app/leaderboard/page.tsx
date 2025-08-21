@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { useAccount } from 'wagmi';
-import { getCachedLeaderboardData, getLeaderboardDebugInfo, type LeaderboardEntry } from "../../lib/leaderboard-api";
+import { getEnhancedLeaderboardData, getLeaderboardDebugInfo, type LeaderboardEntry } from "../../lib/leaderboard-api";
 import LeaderboardEntryComponent from "../../components/LeaderboardEntry";
 import TipButton from "../../components/TipButton";
 
@@ -17,13 +17,13 @@ export default function LeaderboardPage() {
   // Load leaderboard data
   React.useEffect(() => {
     loadLeaderboard();
-  }, []);
+  }, [address]); // Reload when wallet address changes
 
   async function loadLeaderboard() {
     try {
       setLoading(true);
       setError(null);
-      const data = await getCachedLeaderboardData();
+      const data = await getEnhancedLeaderboardData(address);
       setLeaderboard(data);
     } catch (err) {
       console.error('Failed to load leaderboard:', err);

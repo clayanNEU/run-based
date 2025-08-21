@@ -26,6 +26,7 @@ export type LeaderboardEntry = {
   };
   displayName?: string;
   avatar?: string;
+  isRealUser: boolean; // Distinguishes real blockchain users from fallback demo data
 };
 
 /**
@@ -97,7 +98,8 @@ export async function fetchLeaderboardData(): Promise<LeaderboardEntry[]> {
           userStats[recipient] = {
             address: recipient,
             points: 0,
-            contributions: { attend: 0, host: 0, pace: 0, supplies: 0 }
+            contributions: { attend: 0, host: 0, pace: 0, supplies: 0 },
+            isRealUser: true // Real blockchain users
           };
         }
 
@@ -140,19 +142,22 @@ function getFallbackLeaderboard(): LeaderboardEntry[] {
       address: '0x1234567890123456789012345678901234567890',
       points: 120,
       contributions: { attend: 8, host: 1, pace: 2, supplies: 1 },
-      displayName: 'Demo User 1'
+      displayName: 'Demo User 1',
+      isRealUser: false // Fallback demo data
     },
     {
       address: '0x2345678901234567890123456789012345678901',
       points: 95,
       contributions: { attend: 6, host: 0, pace: 1, supplies: 2 },
-      displayName: 'Demo User 2'
+      displayName: 'Demo User 2',
+      isRealUser: false // Fallback demo data
     },
     {
       address: '0x3456789012345678901234567890123456789012',
       points: 80,
       contributions: { attend: 5, host: 1, pace: 0, supplies: 1 },
-      displayName: 'Demo User 3'
+      displayName: 'Demo User 3',
+      isRealUser: false // Fallback demo data
     }
   ];
 }
@@ -185,6 +190,62 @@ export async function getCachedLeaderboardData(): Promise<LeaderboardEntry[]> {
   cachedData = { data, timestamp: now };
   
   return data;
+}
+
+/**
+ * Get enhanced leaderboard data with current user prioritization
+ * Ensures the current user appears in the leaderboard with their actual points
+ */
+export async function getEnhancedLeaderboardData(currentUserAddress?: string): Promise<LeaderboardEntry[]> {
+  const leaderboard = await getCachedLeaderboardData();
+  
+  // If no current user address, return standard leaderboard
+  if (!currentUserAddress) {
+    return leaderboard;
+  }
+
+  const normalizedCurrentUser = currentUserAddress.toLowerCase();
+  
+  // Check if current user is already in the leaderboard
+  const currentUserInLeaderboard = leaderboard.find(
+    entry => entry.address.toLowerCase() === normalizedCurrentUser
+  );
+
+  // If current user is already in leaderboard, return as-is
+  if (currentUserInLeaderboard) {
+    return leaderboard;
+  }
+
+  // If we have real blockchain data but current user isn't in it,
+  // they likely have 0 points, so we'll add them with 0 points
+  const hasRealData = leaderboard.some(entry => entry.isRealUser);
+  
+  if (hasRealData) {
+    // Add current user with 0 points to the end
+    const currentUserEntry: LeaderboardEntry = {
+      address: currentUserAddress,
+      points: 0,
+      contributions: { attend: 0, host: 0, pace: 0, supplies: 0 },
+      isRealUser: true
+    };
+    
+    return [...leaderboard, currentUserEntry];
+  }
+
+  // If we only have fallback data, prioritize showing current user
+  // by replacing one of the demo users
+  const currentUserEntry: LeaderboardEntry = {
+    address: currentUserAddress,
+    points: 0,
+    contributions: { attend: 0, host: 0, pace: 0, supplies: 0 },
+    isRealUser: true
+  };
+
+  // Replace the last demo user with current user
+  const enhancedLeaderboard = [...leaderboard];
+  enhancedLeaderboard[enhancedLeaderboard.length - 1] = currentUserEntry;
+  
+  return enhancedLeaderboard;
 }
 
 /**

@@ -3,7 +3,6 @@
 import * as React from "react";
 import { useAccount } from 'wagmi';
 import { getBlockchainTotals, getNetworkInfo, getDebugInfo, type BlockchainTotals } from "../../lib/blockchain-store";
-import TipButton from "../../components/TipButton";
 
 export default function ProfilePage() {
   const { address } = useAccount();
@@ -135,24 +134,6 @@ export default function ProfilePage() {
         </div>
       )}
 
-      {/* Demo Tip Section */}
-      <div>
-        <h3 style={{ marginBottom: 12 }}>💙 Demo Tipping</h3>
-        <div style={{ 
-          padding: 16, 
-          background: "#f8f9fa", 
-          borderRadius: 12,
-          border: "1px solid #e9ecef"
-        }}>
-          <div style={{ fontSize: 14, marginBottom: 8, color: "#666" }}>
-            For demo purposes, you can tip yourself to test the tipping functionality:
-          </div>
-          <TipButton 
-            recipientAddress={address} 
-            recipientName="yourself (demo)" 
-          />
-        </div>
-      </div>
 
       {/* Debug Information */}
       <div>

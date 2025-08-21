@@ -49,18 +49,29 @@ export default function LeaderboardEntryComponent({
 
       {/* Name and Address */}
       <div style={{ minWidth: 0 }}>
-        <div style={{ fontWeight: 600, fontSize: 16 }}>
+        <div style={{ fontWeight: 600, fontSize: 16, display: "flex", alignItems: "center", gap: 6 }}>
           <Identity address={entry.address as `0x${string}`} chain={base}>
             <Name className="font-semibold" />
           </Identity>
           {isCurrentUser && (
             <span style={{ 
-              marginLeft: 8, 
               fontSize: 12, 
               color: "#0066cc",
               fontWeight: 500
             }}>
               (You)
+            </span>
+          )}
+          {!entry.isRealUser && (
+            <span style={{ 
+              fontSize: 10, 
+              color: "#888",
+              background: "#f0f0f0",
+              padding: "2px 6px",
+              borderRadius: 4,
+              fontWeight: 500
+            }}>
+              DEMO
             </span>
           )}
         </div>
