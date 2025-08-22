@@ -30,10 +30,11 @@ export function useBasename(address: string | undefined) {
     address: address as `0x${string}` | undefined,
   });
 
-  // Format the result: use name if available, otherwise format address
+  // Format the result: use name if available (trust OnchainKit), otherwise format address
   const basename = React.useMemo(() => {
     if (!address) return '';
-    if (name && isBasename(name)) return name;
+    // If OnchainKit returns a name, use it (it's a valid basename)
+    if (name) return name;
     return formatAddress(address);
   }, [address, name]);
 

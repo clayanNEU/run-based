@@ -43,7 +43,7 @@ export default function ProfileStats({ totals, className = '' }: ProfileStatsPro
   if (tipsReceivedEth > 0 || tipsSentEth > 0) {
     stats.push({
       value: parseFloat(tipsReceivedEth.toFixed(4)),
-      label: 'ETH Received',
+      label: 'USDC Received',
       icon: '💰'
     });
   }

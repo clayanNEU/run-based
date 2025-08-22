@@ -73,7 +73,15 @@ export default function ProfilePage() {
         }}>
           {address ? (
             <Identity address={address as `0x${string}`} chain={base}>
-              <Avatar className="w-full h-full" />
+              <Avatar 
+                className="w-full h-full" 
+                style={{ 
+                  width: '100%', 
+                  height: '100%', 
+                  objectFit: 'cover',
+                  display: 'block'
+                }} 
+              />
             </Identity>
           ) : (
             <div style={{

@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { useAccount } from 'wagmi';
-import { getEnhancedLeaderboardData, getLeaderboardDebugInfo, type LeaderboardEntry } from "../../lib/leaderboard-api";
+import { getEnhancedLeaderboardData, type LeaderboardEntry } from "../../lib/leaderboard-api";
 import LeaderboardEntryComponent from "../../components/LeaderboardEntry";
 import TipButton from "../../components/TipButton";
 
@@ -11,7 +11,6 @@ export default function LeaderboardPage() {
   const [leaderboard, setLeaderboard] = React.useState<LeaderboardEntry[]>([]);
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
-  const [showDebug, setShowDebug] = React.useState(false);
   const [selectedTip, setSelectedTip] = React.useState<{ address: string; name: string } | null>(null);
 
   // Load leaderboard data
@@ -89,27 +88,7 @@ export default function LeaderboardPage() {
 
   return (
     <div>
-      <div style={{ 
-        display: "flex", 
-        justifyContent: "space-between", 
-        alignItems: "center",
-        marginBottom: 16
-      }}>
-        <h2 style={{ margin: 0 }}>All-Time Leaderboard</h2>
-        <button
-          onClick={loadLeaderboard}
-          style={{
-            padding: "6px 12px",
-            fontSize: 12,
-            background: "#f0f0f0",
-            border: "1px solid #ddd",
-            borderRadius: 6,
-            cursor: "pointer"
-          }}
-        >
-          🔄 Refresh
-        </button>
-      </div>
+      <h2 style={{ margin: 0, marginBottom: 16 }}>All-Time Leaderboard</h2>
 
       {leaderboard.length === 0 ? (
         <div style={{ 
@@ -192,37 +171,6 @@ export default function LeaderboardPage() {
         </div>
       )}
 
-      {/* Debug Info */}
-      <div style={{ marginTop: 24 }}>
-        <button 
-          onClick={() => setShowDebug(!showDebug)}
-          style={{
-            padding: 8, 
-            fontSize: 12, 
-            background: "#f8f9fa", 
-            border: "1px solid #dee2e6",
-            borderRadius: 8, 
-            cursor: "pointer"
-          }}
-        >
-          {showDebug ? "Hide" : "Show"} Leaderboard Debug
-        </button>
-
-        {showDebug && (
-          <div style={{
-            background: "#f8f9fa", 
-            padding: 12, 
-            borderRadius: 12, 
-            border: "1px solid #dee2e6",
-            fontSize: 12, 
-            fontFamily: "monospace",
-            marginTop: 8
-          }}>
-            <div><strong>Leaderboard Debug:</strong></div>
-            <pre>{JSON.stringify(getLeaderboardDebugInfo(), null, 2)}</pre>
-          </div>
-        )}
-      </div>
     </div>
   );
 }

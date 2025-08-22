@@ -45,7 +45,15 @@ export default function LeaderboardEntryComponent({
       {/* Avatar */}
       <div style={{ width: 40, height: 40, borderRadius: "50%", overflow: "hidden" }}>
         <Identity address={entry.address as `0x${string}`} chain={base}>
-          <Avatar className="w-10 h-10" />
+          <Avatar 
+            className="w-10 h-10" 
+            style={{ 
+              width: '100%', 
+              height: '100%', 
+              objectFit: 'cover',
+              display: 'block'
+            }} 
+          />
         </Identity>
       </div>
 
