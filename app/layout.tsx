@@ -53,7 +53,7 @@ export default function RootLayout({
               <Tab href="/" label="Check-in" emoji="✅" />
               <Tab href="/leaderboard" label="Leaderboard" emoji="🏆" />
               <Tab href="/profile" label="Profile" emoji="🪪" />
-              <Tab href="/compete" label="Compete" emoji="⚡" isComingSoon={true} />
+              <Tab href="/compete" label="Compete" emoji="⚡" />
             </nav>
           </div>
         </RootProvider>
