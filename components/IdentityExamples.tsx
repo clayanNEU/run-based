@@ -7,7 +7,7 @@ import { useBasename } from '../lib/basename-resolver';
 
 export function IdentityExamples() {
   const testAddress = '0x02feeb0AdE57b6adEEdE5A4EEea6Cf8c21BeB6B1';
-  const { basename, isLoading } = useBasename(testAddress);
+  const { basename, isLoading, error: _error } = useBasename(testAddress);
 
   return (
     <div className="p-6 max-w-4xl mx-auto space-y-8">

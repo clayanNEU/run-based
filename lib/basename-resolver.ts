@@ -3,6 +3,8 @@
 // Import React for the hook
 import * as React from 'react';
 import { useName } from '@coinbase/onchainkit/identity';
+import { base, mainnet } from 'viem/chains';
+import { getManualBasename } from './manual-basename-mapping';
 
 /**
  * Formats an address for display (truncated)
@@ -22,23 +24,64 @@ export function isBasename(name: string): boolean {
 }
 
 /**
- * Hook for resolving basename using OnchainKit's useName
+ * Checks if a string is a valid ENS name format
+ */
+export function isENSName(name: string): boolean {
+  return name.endsWith('.eth') && !name.includes('.base.eth') && !name.includes('.basetest.eth');
+}
+
+/**
+ * Hook for resolving both ENS names and basenames using OnchainKit's useName
  * This provides a simple hook-based approach for custom identity displays
  */
 export function useBasename(address: string | undefined) {
-  const { data: name, isLoading } = useName({
-    address: address as `0x${string}` | undefined,
+  // Convert address to the correct type or undefined
+  const validAddress = React.useMemo(() => {
+    if (!address || !address.startsWith('0x')) return undefined;
+    return address as `0x${string}`;
+  }, [address]);
+  
+  // Try basename resolution first (Base chain)
+  const { data: basename, isLoading: basenameLoading, error: basenameError } = useName({
+    address: validAddress,
+    chain: base, // For basename resolution
   });
 
-  // Format the result: use name if available (trust OnchainKit), otherwise format address
-  const basename = React.useMemo(() => {
-    if (!address) return '';
-    // If OnchainKit returns a name, use it (it's a valid basename)
-    if (name) return name;
-    return formatAddress(address);
-  }, [address, name]);
+  // Try ENS resolution (Ethereum mainnet)
+  const { data: ensName, isLoading: ensLoading, error: ensError } = useName({
+    address: validAddress,
+    chain: mainnet, // For ENS resolution
+  });
 
-  return { basename, isLoading: isLoading || false };
+  // Format the result: prioritize basename, then ENS, then manual mapping, then truncated address
+  const resolvedName = React.useMemo(() => {
+    if (!address) return '';
+    
+    // Prioritize basename if available
+    if (basename) return basename;
+    
+    // Fall back to ENS name if available
+    if (ensName) return ensName;
+    
+    // Check manual mapping as fallback
+    const manualName = getManualBasename(address);
+    if (manualName) return manualName;
+    
+    // Finally fall back to truncated address
+    return formatAddress(address);
+  }, [address, basename, ensName]);
+
+  const isLoading = basenameLoading || ensLoading;
+  const error = basenameError || ensError;
+
+  return { 
+    basename: resolvedName, // Keep the same property name for backward compatibility
+    isLoading: isLoading || false,
+    error: error || null,
+    // Additional info for debugging
+    resolvedBasename: basename,
+    resolvedENS: ensName,
+  };
 }
 
 // Re-export OnchainKit components for convenience

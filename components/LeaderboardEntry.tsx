@@ -1,9 +1,10 @@
 "use client";
 
 import * as React from "react";
-import { Identity, Name, Avatar } from '@coinbase/onchainkit/identity';
+import { Identity, Avatar } from '@coinbase/onchainkit/identity';
 import { base } from 'viem/chains';
-import { formatAddress, type LeaderboardEntry } from '../lib/leaderboard-api';
+import { type LeaderboardEntry } from '../lib/leaderboard-api';
+import { useBasename } from '../lib/basename-resolver';
 
 type LeaderboardEntryProps = {
   entry: LeaderboardEntry;
@@ -20,7 +21,8 @@ export default function LeaderboardEntryComponent({
   onTip 
 }: LeaderboardEntryProps) {
   const isCurrentUser = currentUserAddress?.toLowerCase() === entry.address.toLowerCase();
-  const fallbackName = entry.displayName || formatAddress(entry.address);
+  const { basename: resolvedName } = useBasename(entry.address);
+  const fallbackName = entry.displayName || resolvedName;
   
   return (
     <div style={{
@@ -60,11 +62,9 @@ export default function LeaderboardEntryComponent({
       {/* Name and Address */}
       <div style={{ minWidth: 0 }}>
         <div style={{ fontWeight: 600, fontSize: 16, display: "flex", alignItems: "center", gap: 6 }}>
-          <Name 
-            address={entry.address as `0x${string}`} 
-            chain={base}
-            className="font-semibold"
-          />
+          <span className="font-semibold">
+            {resolvedName}
+          </span>
           {isCurrentUser && (
             <span style={{ 
               fontSize: 12, 

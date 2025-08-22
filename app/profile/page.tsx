@@ -2,13 +2,15 @@
 
 import * as React from "react";
 import { useAccount } from 'wagmi';
-import { Identity, Name, Avatar } from '@coinbase/onchainkit/identity';
+import { Identity, Avatar } from '@coinbase/onchainkit/identity';
 import { base } from 'viem/chains';
 import { getBlockchainTotals, type BlockchainTotals } from "../../lib/blockchain-store";
 import { DetailedProfileStats } from "../../components/ProfileStats";
+import { useBasename } from "../../lib/basename-resolver";
 
 export default function ProfilePage() {
   const { address } = useAccount();
+  const { basename: resolvedName } = useBasename(address);
   const [totals, setTotals] = React.useState<BlockchainTotals>({
     attend: 0, host: 0, pace: 0, supplies: 0,
     points: 0, streak: 0, badges: [],
@@ -109,11 +111,7 @@ export default function ProfilePage() {
               fontWeight: 'var(--font-weight-bold)',
               color: 'var(--color-text)'
             }}>
-              <Name 
-                address={address as `0x${string}`} 
-                chain={base}
-                className="font-bold text-xl" 
-              />
+              {resolvedName}
             </h2>
           ) : (
             <h2 style={{ 
