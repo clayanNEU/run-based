@@ -101,9 +101,11 @@ export default function ProfilePage() {
               fontWeight: 'var(--font-weight-bold)',
               color: 'var(--color-text)'
             }}>
-              <Identity address={address as `0x${string}`} chain={base}>
-                <Name className="font-bold text-xl" />
-              </Identity>
+              <Name 
+                address={address as `0x${string}`} 
+                chain={base}
+                className="font-bold text-xl" 
+              />
             </h2>
           ) : (
             <h2 style={{ 

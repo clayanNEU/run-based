@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Basename Test</title>
+    <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+</head>
+<body>
+    <div id="root"></div>
+    <script>
+        // Simple test to check if the address from the example has a basename
+        const testAddress = '0x02feeb0AdE57b6adEEdE5A4EEea6Cf8c21BeB6B1';
+        console.log('Testing address:', testAddress);
+        
+        // Test the addresses from your leaderboard
+        const leaderboardAddresses = [
+            '0x4338c5b43a506b2cda1fe09d019e55934cac61e0',
+            '0xe2d858b3d24787f4af64bbc1380dbf34386274d9', 
+            '0x015b5df1673499e32d11cf786a43d1c42b3d725c'
+        ];
+        
+        console.log('Leaderboard addresses to test:', leaderboardAddresses);
+        
+        // Try to fetch basename data directly
+        leaderboardAddresses.forEach(async (address) => {
+            try {
+                const response = await fetch(`https://api.basenames.org/v1/name/${address}`);
+                console.log(`Response for ${address}:`, response.status, response.statusText);
+                if (response.ok) {
+                    const data = await response.json();
+                    console.log(`Basename data for ${address}:`, data);
+                } else {
+                    console.log(`No basename found for ${address}`);
+                }
+            } catch (error) {
+                console.error(`Error fetching basename for ${address}:`, error);
+            }
+        });
+        
+        document.getElementById('root').innerHTML = '<h1>Check console for basename test results</h1>';
+    </script>
+</body>
+</html>
