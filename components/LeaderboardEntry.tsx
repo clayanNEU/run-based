@@ -12,6 +12,35 @@ type LeaderboardEntryProps = {
   onTip?: (address: string, name: string) => void;
 };
 
+// Component to capture the resolved name from OnchainKit
+function NameCapture({ 
+  address, 
+  onNameResolved 
+}: { 
+  address: string; 
+  onNameResolved: (name: string) => void;
+}) {
+  const nameRef = React.useRef<HTMLSpanElement>(null);
+  
+  React.useEffect(() => {
+    // Use a timeout to allow OnchainKit to resolve the name
+    const timer = setTimeout(() => {
+      if (nameRef.current) {
+        const resolvedName = nameRef.current.textContent || formatAddress(address);
+        onNameResolved(resolvedName);
+      }
+    }, 1000); // Give OnchainKit time to resolve
+    
+    return () => clearTimeout(timer);
+  }, [address, onNameResolved]);
+  
+  return (
+    <span ref={nameRef}>
+      <Name className="font-semibold" />
+    </span>
+  );
+}
+
 export default function LeaderboardEntryComponent({ 
   entry, 
   rank, 
@@ -19,6 +48,9 @@ export default function LeaderboardEntryComponent({
   onTip 
 }: LeaderboardEntryProps) {
   const isCurrentUser = currentUserAddress?.toLowerCase() === entry.address.toLowerCase();
+  const [resolvedName, setResolvedName] = React.useState<string>(
+    entry.displayName || formatAddress(entry.address)
+  );
   
   return (
     <div style={{
@@ -51,7 +83,10 @@ export default function LeaderboardEntryComponent({
       <div style={{ minWidth: 0 }}>
         <div style={{ fontWeight: 600, fontSize: 16, display: "flex", alignItems: "center", gap: 6 }}>
           <Identity address={entry.address as `0x${string}`} chain={base}>
-            <Name className="font-semibold" />
+            <NameCapture 
+              address={entry.address} 
+              onNameResolved={setResolvedName}
+            />
           </Identity>
           {isCurrentUser && (
             <span style={{ 
@@ -111,7 +146,7 @@ export default function LeaderboardEntryComponent({
       {/* Tip Button */}
       {onTip && !isCurrentUser && (
         <button
-          onClick={() => onTip(entry.address, entry.displayName || formatAddress(entry.address))}
+          onClick={() => onTip(entry.address, resolvedName)}
           style={{
             padding: "6px 12px",
             fontSize: 12,

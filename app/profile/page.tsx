@@ -2,13 +2,13 @@
 
 import * as React from "react";
 import { useAccount } from 'wagmi';
+import { Identity, Name, Avatar } from '@coinbase/onchainkit/identity';
+import { base } from 'viem/chains';
 import { getBlockchainTotals, type BlockchainTotals } from "../../lib/blockchain-store";
-import { useBasename, isBasename } from "../../lib/basename-resolver";
 import { DetailedProfileStats } from "../../components/ProfileStats";
 
 export default function ProfilePage() {
   const { address } = useAccount();
-  const { basename, isLoading: basenameLoading } = useBasename(address);
   const [totals, setTotals] = React.useState<BlockchainTotals>({
     attend: 0, host: 0, pace: 0, supplies: 0,
     points: 0, streak: 0, badges: [],
@@ -67,27 +67,44 @@ export default function ProfilePage() {
           width: '80px',
           height: '80px',
           borderRadius: '50%',
-          background: 'linear-gradient(135deg, var(--color-primary), var(--color-accent))',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
+          overflow: 'hidden',
           margin: '0 auto var(--spacing-md)',
-          fontSize: 'var(--font-size-2xl)',
-          color: 'white',
-          fontWeight: 'var(--font-weight-bold)'
+          border: '3px solid var(--color-primary)'
         }}>
-          🏃‍♀️
+          {address ? (
+            <Identity address={address as `0x${string}`} chain={base}>
+              <Avatar className="w-full h-full" />
+            </Identity>
+          ) : (
+            <div style={{
+              width: '100%',
+              height: '100%',
+              background: 'linear-gradient(135deg, var(--color-primary), var(--color-accent))',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontSize: 'var(--font-size-2xl)',
+              color: 'white',
+              fontWeight: 'var(--font-weight-bold)'
+            }}>
+              🏃‍♀️
+            </div>
+          )}
         </div>
         
         {/* Username/Address */}
         <div style={{ marginBottom: 'var(--spacing-sm)' }}>
-          {basenameLoading ? (
-            <div style={{ 
-              fontSize: 'var(--font-size-lg)',
-              color: 'var(--color-text-secondary)'
+          {address ? (
+            <h2 style={{ 
+              margin: 0,
+              fontSize: 'var(--font-size-xl)',
+              fontWeight: 'var(--font-weight-bold)',
+              color: 'var(--color-text)'
             }}>
-              Loading...
-            </div>
+              <Identity address={address as `0x${string}`} chain={base}>
+                <Name className="font-bold text-xl" />
+              </Identity>
+            </h2>
           ) : (
             <h2 style={{ 
               margin: 0,
@@ -95,23 +112,25 @@ export default function ProfilePage() {
               fontWeight: 'var(--font-weight-bold)',
               color: 'var(--color-text)'
             }}>
-              {isBasename(basename) ? basename : 'Runner'}
+              Runner
             </h2>
           )}
         </div>
         
         {/* Address */}
-        <div style={{ 
-          fontSize: 'var(--font-size-sm)', 
-          color: 'var(--color-text-secondary)',
-          fontFamily: 'monospace',
-          background: 'var(--color-surface)',
-          padding: 'var(--spacing-xs) var(--spacing-md)',
-          borderRadius: 'var(--radius-full)',
-          display: 'inline-block'
-        }}>
-          {address ? (isBasename(basename) ? address.slice(0, 6) + '...' + address.slice(-4) : basename) : ''}
-        </div>
+        {address && (
+          <div style={{ 
+            fontSize: 'var(--font-size-sm)', 
+            color: 'var(--color-text-secondary)',
+            fontFamily: 'monospace',
+            background: 'var(--color-surface)',
+            padding: 'var(--spacing-xs) var(--spacing-md)',
+            borderRadius: 'var(--radius-full)',
+            display: 'inline-block'
+          }}>
+            {address.slice(0, 6)}...{address.slice(-4)}
+          </div>
+        )}
       </div>
 
       {/* Stats Section */}
