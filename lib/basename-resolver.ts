@@ -2,48 +2,7 @@
 
 // Import React for the hook
 import * as React from 'react';
-
-// Cache for basename resolutions to avoid repeated API calls
-const basenameCache = new Map<string, string | null>();
-
-/**
- * Resolves a wallet address to its basename (if available)
- * Falls back to truncated address if no basename is found
- */
-export async function resolveBasename(address: string): Promise<string> {
-  if (!address) return '';
-  
-  // Check cache first
-  const cacheKey = address.toLowerCase();
-  if (basenameCache.has(cacheKey)) {
-    const cached = basenameCache.get(cacheKey);
-    return cached || formatAddress(address);
-  }
-  
-  try {
-    // Try to resolve basename using Base's API
-    const response = await fetch(`https://api.basenames.org/v1/name/${address}`);
-    
-    if (response.ok) {
-      const data = await response.json();
-      if (data.name) {
-        const basename = data.name;
-        basenameCache.set(cacheKey, basename);
-        return basename;
-      }
-    }
-    
-    // If no basename found, cache null and return formatted address
-    basenameCache.set(cacheKey, null);
-    return formatAddress(address);
-    
-  } catch (error) {
-    console.warn('Failed to resolve basename:', error);
-    // Cache null on error and return formatted address
-    basenameCache.set(cacheKey, null);
-    return formatAddress(address);
-  }
-}
+import { useName } from '@coinbase/onchainkit/identity';
 
 /**
  * Formats an address for display (truncated)
@@ -51,7 +10,7 @@ export async function resolveBasename(address: string): Promise<string> {
 export function formatAddress(address: string): string {
   if (!address) return '';
   if (address.length <= 10) return address;
-  
+
   return `${address.slice(0, 6)}...${address.slice(-4)}`;
 }
 
@@ -63,23 +22,23 @@ export function isBasename(name: string): boolean {
 }
 
 /**
- * Hook for resolving basename with React state management
+ * Hook for resolving basename using OnchainKit's useName
+ * This provides a simple hook-based approach for custom identity displays
  */
 export function useBasename(address: string | undefined) {
-  const [basename, setBasename] = React.useState<string>('');
-  const [isLoading, setIsLoading] = React.useState(false);
-  
-  React.useEffect(() => {
-    if (!address) {
-      setBasename('');
-      return;
-    }
-    
-    setIsLoading(true);
-    resolveBasename(address)
-      .then(setBasename)
-      .finally(() => setIsLoading(false));
-  }, [address]);
-  
-  return { basename, isLoading };
+  const { data: name, isLoading } = useName({
+    address: address as `0x${string}` | undefined,
+  });
+
+  // Format the result: use name if available, otherwise format address
+  const basename = React.useMemo(() => {
+    if (!address) return '';
+    if (name && isBasename(name)) return name;
+    return formatAddress(address);
+  }, [address, name]);
+
+  return { basename, isLoading: isLoading || false };
 }
+
+// Re-export OnchainKit components for convenience
+export { Name, IdentityCard, Identity, Avatar, Badge } from '@coinbase/onchainkit/identity';

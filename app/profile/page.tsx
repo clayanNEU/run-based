@@ -137,7 +137,7 @@ export default function ProfilePage() {
 
       {/* Stats Section */}
       <div>
-        <h3 style={{ 
+        <h3 style={{
           marginBottom: 'var(--spacing-md)',
           fontSize: 'var(--font-size-lg)',
           fontWeight: 'var(--font-weight-semibold)',
@@ -146,23 +146,6 @@ export default function ProfilePage() {
           📊 Your Stats
         </h3>
         <DetailedProfileStats totals={totals} showBreakdown={false} />
-      </div>
-
-
-      {/* Blockchain Info */}
-      <div className="card" style={{ padding: 'var(--spacing-md)' }}>
-        <div style={{
-          fontSize: 'var(--font-size-xs)',
-          color: 'var(--color-text-muted)',
-          textAlign: 'center',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          gap: 'var(--spacing-xs)'
-        }}>
-          <span>⛓️</span>
-          <span>Your achievements are permanently stored on Base blockchain</span>
-        </div>
       </div>
     </div>
   );
