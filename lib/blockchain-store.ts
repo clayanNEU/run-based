@@ -484,6 +484,72 @@ export async function makeBlockchainContribution(type: ContributionType): Promis
 }
 
 /**
+ * Check if user has already contributed today for each contribution type
+ */
+export async function getDailyContributionStatus(userAddress: string): Promise<{
+  ATTEND: boolean;
+  HOST: boolean;
+  PACE: boolean;
+  SUPPLIES: boolean;
+}> {
+  if (!userAddress || !CONTRACT_ADDRESS) {
+    return { ATTEND: false, HOST: false, PACE: false, SUPPLIES: false };
+  }
+
+  try {
+    const ethereum = (window as { ethereum?: { request: (args: { method: string; params?: unknown[] }) => Promise<unknown> } }).ethereum;
+    if (!ethereum) {
+      return { ATTEND: false, HOST: false, PACE: false, SUPPLIES: false };
+    }
+
+    const publicClient = createPublicClient({
+      chain: EXPECTED_CHAIN,
+      transport: custom(ethereum)
+    });
+
+    const today = `day-${Math.floor(Date.now() / (1000 * 60 * 60 * 24))}`;
+
+    // Check last contribution date for each type
+    const [attendDate, hostDate, paceDate, suppliesDate] = await Promise.all([
+      publicClient.readContract({
+        address: CONTRACT_ADDRESS,
+        abi: ContributionBadgesABI.abi,
+        functionName: 'lastContribution',
+        args: [userAddress, CONTRIBUTION_TYPES.ATTEND]
+      }) as Promise<string>,
+      publicClient.readContract({
+        address: CONTRACT_ADDRESS,
+        abi: ContributionBadgesABI.abi,
+        functionName: 'lastContribution',
+        args: [userAddress, CONTRIBUTION_TYPES.HOST]
+      }) as Promise<string>,
+      publicClient.readContract({
+        address: CONTRACT_ADDRESS,
+        abi: ContributionBadgesABI.abi,
+        functionName: 'lastContribution',
+        args: [userAddress, CONTRIBUTION_TYPES.PACE]
+      }) as Promise<string>,
+      publicClient.readContract({
+        address: CONTRACT_ADDRESS,
+        abi: ContributionBadgesABI.abi,
+        functionName: 'lastContribution',
+        args: [userAddress, CONTRIBUTION_TYPES.SUPPLIES]
+      }) as Promise<string>
+    ]);
+
+    return {
+      ATTEND: attendDate === today,
+      HOST: hostDate === today,
+      PACE: paceDate === today,
+      SUPPLIES: suppliesDate === today
+    };
+  } catch (error) {
+    console.error('Failed to check daily contribution status:', error);
+    return { ATTEND: false, HOST: false, PACE: false, SUPPLIES: false };
+  }
+}
+
+/**
  * Check if user can contribute today (simplified - let contract handle validation)
  */
 export async function canMakeContribution(

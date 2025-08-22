@@ -110,7 +110,7 @@ export default function ProfilePage() {
           borderRadius: 'var(--radius-full)',
           display: 'inline-block'
         }}>
-          {basename}
+          {address ? (isBasename(basename) ? address.slice(0, 6) + '...' + address.slice(-4) : basename) : ''}
         </div>
       </div>
 
@@ -127,43 +127,6 @@ export default function ProfilePage() {
         <DetailedProfileStats totals={totals} showBreakdown={false} />
       </div>
 
-      {/* Quick Actions */}
-      <div className="card" style={{ padding: 'var(--spacing-lg)' }}>
-        <h3 style={{ 
-          marginTop: 0,
-          marginBottom: 'var(--spacing-md)',
-          fontSize: 'var(--font-size-lg)',
-          fontWeight: 'var(--font-weight-semibold)',
-          color: 'var(--color-text)'
-        }}>
-          🚀 Quick Actions
-        </h3>
-        <div style={{ 
-          display: 'grid', 
-          gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', 
-          gap: 'var(--spacing-md)' 
-        }}>
-          <QuickActionButton 
-            emoji="✅" 
-            label="Check In" 
-            description="Record attendance"
-            href="/"
-          />
-          <QuickActionButton 
-            emoji="🏆" 
-            label="Leaderboard" 
-            description="See rankings"
-            href="/leaderboard"
-          />
-          <QuickActionButton 
-            emoji="🎯" 
-            label="Compete" 
-            description="Coming soon"
-            href="/compete"
-            disabled
-          />
-        </div>
-      </div>
 
       {/* Blockchain Info */}
       <div className="card" style={{ padding: 'var(--spacing-md)' }}>
@@ -181,61 +144,5 @@ export default function ProfilePage() {
         </div>
       </div>
     </div>
-  );
-}
-
-function QuickActionButton({ 
-  emoji, 
-  label, 
-  description, 
-  href, 
-  disabled = false 
-}: { 
-  emoji: string; 
-  label: string; 
-  description: string; 
-  href: string;
-  disabled?: boolean;
-}) {
-  const buttonContent = (
-    <div style={{
-      padding: 'var(--spacing-md)',
-      borderRadius: 'var(--radius-md)',
-      border: `1px solid var(--color-border)`,
-      background: disabled ? 'var(--color-surface)' : 'var(--color-background)',
-      textAlign: 'center',
-      cursor: disabled ? 'not-allowed' : 'pointer',
-      opacity: disabled ? 0.6 : 1,
-      transition: 'all 0.2s ease',
-      textDecoration: 'none',
-      color: 'inherit'
-    }}>
-      <div style={{ fontSize: 'var(--font-size-2xl)', marginBottom: 'var(--spacing-xs)' }}>
-        {emoji}
-      </div>
-      <div style={{ 
-        fontWeight: 'var(--font-weight-semibold)', 
-        marginBottom: 'var(--spacing-xs)',
-        fontSize: 'var(--font-size-sm)'
-      }}>
-        {label}
-      </div>
-      <div style={{ 
-        fontSize: 'var(--font-size-xs)', 
-        color: 'var(--color-text-secondary)' 
-      }}>
-        {description}
-      </div>
-    </div>
-  );
-
-  if (disabled) {
-    return buttonContent;
-  }
-
-  return (
-    <a href={href} style={{ textDecoration: 'none', color: 'inherit' }}>
-      {buttonContent}
-    </a>
   );
 }

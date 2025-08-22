@@ -7,6 +7,7 @@ import {
   makeContributionWithSponsorship, 
   getSuccessMessage,
   getPointsForType,
+  getDailyContributionStatus,
   type ContributionType,
   type BlockchainTotals 
 } from "../lib/blockchain-store";
@@ -30,6 +31,12 @@ export default function ContributionButtons() {
     points: 0, streak: 0, badges: [], 
     tipsReceived: 0, tipsSent: 0 
   });
+  const [dailyStatus, setDailyStatus] = React.useState<{
+    ATTEND: boolean;
+    HOST: boolean;
+    PACE: boolean;
+    SUPPLIES: boolean;
+  }>({ ATTEND: false, HOST: false, PACE: false, SUPPLIES: false });
   const [toast, setToast] = React.useState<string | null>(null);
   const [loading, setLoading] = React.useState<string | null>(null);
   const [shareReady, setShareReady] = React.useState<{ title: string } | null>(null);
@@ -43,6 +50,7 @@ export default function ContributionButtons() {
   React.useEffect(() => {
     if (address) {
       getBlockchainTotals(address).then(setTotals);
+      getDailyContributionStatus(address).then(setDailyStatus);
     }
   }, [address]);
 
@@ -74,6 +82,9 @@ export default function ContributionButtons() {
       
       // Trigger celebration
       triggerCelebration(key);
+      
+      // Update daily status to disable button
+      setDailyStatus(prev => ({ ...prev, [key]: true }));
       
       // Optimistic UI update
       const points = getPointsForType(key);
@@ -166,7 +177,8 @@ export default function ContributionButtons() {
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 'var(--spacing-md)' }}>
         {BUTTONS.map(b => {
           const cooldown = getCooldownForType(b.key);
-          const isDisabled = loading === b.key || cooldown.isDisabled;
+          const alreadyContributedToday = dailyStatus[b.key];
+          const isDisabled = loading === b.key || cooldown.isDisabled || alreadyContributedToday;
           
           return (
             <button
@@ -207,9 +219,11 @@ export default function ContributionButtons() {
               <div style={{ fontSize: 'var(--font-size-xs)', color: 'var(--color-text-secondary)' }}>
                 {loading === b.key 
                   ? "Confirming transaction..." 
-                  : cooldown.isDisabled 
-                    ? `Wait ${formatTimeRemaining(cooldown.timeRemaining)}`
-                    : hint(b.key)
+                  : alreadyContributedToday
+                    ? "Already contributed today ✅"
+                    : cooldown.isDisabled 
+                      ? `Wait ${formatTimeRemaining(cooldown.timeRemaining)}`
+                      : hint(b.key)
                 }
               </div>
             </button>
