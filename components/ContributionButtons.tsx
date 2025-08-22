@@ -7,20 +7,20 @@ import {
   makeContributionWithSponsorship, 
   getSuccessMessage,
   getPointsForType,
-  getNetworkInfo,
-  getDebugInfo,
-  getPaymasterStatus,
   type ContributionType,
   type BlockchainTotals 
 } from "../lib/blockchain-store";
+import PillBadge, { getPointsVariant } from "./PillBadge";
+import CelebrationEffect, { useCelebration } from "./CelebrationEffect";
+import { useMultipleButtonCooldowns, formatTimeRemaining } from "../hooks/useButtonCooldown";
 
-type Btn = { key: ContributionType; label: string; emoji: string; note: string };
+type Btn = { key: ContributionType; label: string; emoji: string; points: number };
 
 const BUTTONS: Btn[] = [
-  { key: "ATTEND",  label: "Attend",   emoji: "✅", note: `+${getPointsForType("ATTEND")}` },
-  { key: "HOST",    label: "Host",     emoji: "🏁", note: `+${getPointsForType("HOST")}` },
-  { key: "PACE",    label: "Pace",     emoji: "⏱️", note: `+${getPointsForType("PACE")}` },
-  { key: "SUPPLIES",label: "Supplies", emoji: "🧃", note: `+${getPointsForType("SUPPLIES")}` },
+  { key: "ATTEND",  label: "Attend",   emoji: "✅", points: getPointsForType("ATTEND") },
+  { key: "HOST",    label: "Host",     emoji: "🏁", points: getPointsForType("HOST") },
+  { key: "PACE",    label: "Pace",     emoji: "⏱️", points: getPointsForType("PACE") },
+  { key: "SUPPLIES",label: "Supplies", emoji: "🧃", points: getPointsForType("SUPPLIES") },
 ];
 
 export default function ContributionButtons() {
@@ -33,24 +33,16 @@ export default function ContributionButtons() {
   const [toast, setToast] = React.useState<string | null>(null);
   const [loading, setLoading] = React.useState<string | null>(null);
   const [shareReady, setShareReady] = React.useState<{ title: string } | null>(null);
-  const [networkInfo, setNetworkInfo] = React.useState<{
-    chainId: number;
-    chainName: string;
-    isCorrectNetwork: boolean;
-    expectedChainId: number;
-    expectedChainName: string;
-  } | null>(null);
-  const [showDebug, setShowDebug] = React.useState(false);
-  const [lastTransaction, setLastTransaction] = React.useState<{ hash: string; explorerUrl: string; sponsored?: boolean; fallbackReason?: string } | null>(null);
-  const [paymasterStatus, setPaymasterStatus] = React.useState<{ available: boolean; walletSupported: boolean; configured: boolean } | null>(null);
   const appUrl = process.env.NEXT_PUBLIC_URL || "https://run-based.vercel.app";
 
-  // Load blockchain data and network info when wallet connects
+  // New hooks for enhanced functionality
+  const { getCooldownForType } = useMultipleButtonCooldowns();
+  const { isActive: celebrationActive, type: celebrationType, triggerCelebration, completeCelebration } = useCelebration();
+
+  // Load blockchain data when wallet connects
   React.useEffect(() => {
     if (address) {
       getBlockchainTotals(address).then(setTotals);
-      getNetworkInfo().then(setNetworkInfo);
-      getPaymasterStatus().then(setPaymasterStatus);
     }
   }, [address]);
 
@@ -61,48 +53,29 @@ export default function ContributionButtons() {
       return;
     }
 
-    // Check network before proceeding
-    const currentNetworkInfo = await getNetworkInfo();
-    setNetworkInfo(currentNetworkInfo);
-    
-    if (!currentNetworkInfo.isCorrectNetwork) {
-      setToast(`Wrong network! Please switch to ${currentNetworkInfo.expectedChainName}`);
-      setTimeout(() => setToast(null), 4000);
+    // Check cooldown
+    const cooldown = getCooldownForType(key);
+    if (cooldown.isDisabled) {
+      setToast(`Wait ${formatTimeRemaining(cooldown.timeRemaining)} before contributing again`);
+      setTimeout(() => setToast(null), 2000);
       return;
     }
 
     setLoading(key);
-    setLastTransaction(null);
     
     try {
-      // Check paymaster status and show appropriate message
-      const currentPaymasterStatus = await getPaymasterStatus();
-      setPaymasterStatus(currentPaymasterStatus);
+      setToast("Processing contribution... ⏳");
       
-      if (currentPaymasterStatus.available) {
-        setToast("Attempting gas-free transaction... ⚡");
-      } else {
-        setToast("Transaction submitted... ⏳");
-      }
+      // Make blockchain transaction
+      const _result = await makeContributionWithSponsorship(key);
       
-      // Make blockchain transaction with sponsorship attempt and wait for confirmation
-      const result = await makeContributionWithSponsorship(key);
-      setLastTransaction(result);
+      // Trigger cooldown
+      cooldown.triggerCooldown();
       
-      // Show appropriate success message based on sponsorship status
-      if (result.sponsored) {
-        setToast(`✅ Gas-free transaction confirmed! Hash: ${result.hash.slice(0, 10)}...`);
-      } else {
-        setToast(`✅ Transaction confirmed! Hash: ${result.hash.slice(0, 10)}...`);
-        if (result.fallbackReason) {
-          setTimeout(() => {
-            setToast(`ℹ️ ${result.fallbackReason}`);
-            setTimeout(() => setToast(null), 3000);
-          }, 2000);
-        }
-      }
+      // Trigger celebration
+      triggerCelebration(key);
       
-      // Optimistic UI update - immediately update points and badge count
+      // Optimistic UI update
       const points = getPointsForType(key);
       const optimisticTotals = { ...totals };
       optimisticTotals.points += points;
@@ -122,13 +95,12 @@ export default function ContributionButtons() {
       
       setTotals(optimisticTotals);
       
-      // Show success message immediately
+      // Show success message
       const msg = getSuccessMessage(key);
-      const sponsorshipEmoji = result.sponsored ? "⚡" : "🎉";
-      setToast(`${msg} + Badge earned! ${sponsorshipEmoji}`);
+      setToast(`${msg} + Badge earned! 🎉`);
       setShareReady({ title: `${msg} - Badge earned!` });
       
-      // Refresh from blockchain after a delay to ensure consistency
+      // Refresh from blockchain after delay
       setTimeout(async () => {
         const newTotals = await getBlockchainTotals(address);
         setTotals(newTotals);
@@ -146,8 +118,6 @@ export default function ContributionButtons() {
         errorMessage = "Already contributed today ✅";
       } else if (errorObj.message?.includes("User rejected")) {
         errorMessage = "Transaction cancelled";
-      } else if (errorObj.message?.includes("Wrong network")) {
-        errorMessage = errorObj.message;
       } else if (errorObj.shortMessage) {
         errorMessage = errorObj.shortMessage;
       }
@@ -176,16 +146,14 @@ export default function ContributionButtons() {
 
   if (!address) {
     return (
-      <div style={{ 
-        padding: 20, 
+      <div className="card" style={{ 
+        padding: 'var(--spacing-xl)', 
         textAlign: "center", 
-        background: "#f9f9f9", 
-        borderRadius: 12,
-        border: "1px solid #eee"
+        background: "var(--color-surface)", 
       }}>
-        <div style={{ fontSize: 18, marginBottom: 8 }}>🔗</div>
-        <div style={{ fontWeight: 600, marginBottom: 4 }}>Connect Wallet</div>
-        <div style={{ fontSize: 14, color: "#666" }}>
+        <div style={{ fontSize: 'var(--font-size-lg)', marginBottom: 'var(--spacing-sm)' }}>🔗</div>
+        <div style={{ fontWeight: 'var(--font-weight-semibold)', marginBottom: 'var(--spacing-xs)' }}>Connect Wallet</div>
+        <div style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-secondary)' }}>
           Connect your wallet to start earning contribution badges on Base
         </div>
       </div>
@@ -193,148 +161,128 @@ export default function ContributionButtons() {
   }
 
   return (
-    <div style={{ display: "grid", gap: 12 }}>
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-        {BUTTONS.map(b => (
-          <button
-            key={b.key}
-            onClick={() => onClick(b.key)}
-            disabled={loading === b.key}
-            style={{
-              padding: 18, borderRadius: 14, border: "1px solid #e8e8e8",
-              fontSize: 18, background: loading === b.key ? "#f0f0f0" : "#fff", 
-              textAlign: "left", boxShadow: "0 1px 4px rgba(0,0,0,0.06)",
-              cursor: loading === b.key ? "not-allowed" : "pointer",
-              opacity: loading === b.key ? 0.7 : 1
-            }}
-          >
-            <div style={{ fontSize: 28 }}>{b.emoji}</div>
-            <div style={{ fontWeight: 700 }}>
-              {loading === b.key ? "Processing..." : b.label} 
-              <span style={{ color: "#666", fontWeight: 500 }}> {b.note}</span>
-            </div>
-            <div style={{ fontSize: 12, color: "#777" }}>
-              {loading === b.key ? "Confirming transaction..." : hint(b.key)}
-            </div>
-          </button>
-        ))}
+    <div style={{ display: "grid", gap: 'var(--spacing-md)' }}>
+      {/* Contribution Buttons */}
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 'var(--spacing-md)' }}>
+        {BUTTONS.map(b => {
+          const cooldown = getCooldownForType(b.key);
+          const isDisabled = loading === b.key || cooldown.isDisabled;
+          
+          return (
+            <button
+              key={b.key}
+              onClick={() => onClick(b.key)}
+              disabled={isDisabled}
+              className={`btn ${loading === b.key ? 'celebration-pulse' : ''}`}
+              style={{
+                padding: 'var(--spacing-lg)', 
+                borderRadius: 'var(--radius-lg)', 
+                border: `1px solid var(--color-border)`,
+                fontSize: 'var(--font-size-lg)', 
+                background: isDisabled ? 'var(--color-surface)' : 'var(--color-background)', 
+                textAlign: "left", 
+                boxShadow: 'var(--shadow-sm)',
+                cursor: isDisabled ? "not-allowed" : "pointer",
+                opacity: isDisabled ? 0.6 : 1,
+                position: 'relative',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: 'var(--spacing-xs)'
+              }}
+            >
+              <div style={{ fontSize: 'var(--font-size-3xl)' }}>{b.emoji}</div>
+              <div style={{ 
+                display: 'flex', 
+                alignItems: 'center', 
+                gap: 'var(--spacing-sm)',
+                fontWeight: 'var(--font-weight-bold)' 
+              }}>
+                {loading === b.key ? "Processing..." : b.label}
+                <PillBadge 
+                  points={b.points} 
+                  variant={getPointsVariant(b.points)}
+                  size="sm"
+                />
+              </div>
+              <div style={{ fontSize: 'var(--font-size-xs)', color: 'var(--color-text-secondary)' }}>
+                {loading === b.key 
+                  ? "Confirming transaction..." 
+                  : cooldown.isDisabled 
+                    ? `Wait ${formatTimeRemaining(cooldown.timeRemaining)}`
+                    : hint(b.key)
+                }
+              </div>
+            </button>
+          );
+        })}
       </div>
 
+      {/* Share Button */}
       {shareReady && (
-        <button onClick={onShare}
-          style={{ padding: 14, borderRadius: 12, background: "#111", color: "#fff", fontWeight: 700 }}>
+        <button 
+          onClick={onShare}
+          className="btn btn--primary"
+          style={{ 
+            padding: 'var(--spacing-lg)', 
+            borderRadius: 'var(--radius-md)', 
+            fontWeight: 'var(--font-weight-bold)' 
+          }}
+        >
           Share to Base feed
         </button>
       )}
 
-      <div style={{
-        display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, fontSize: 14,
-        background: "#fafafa", padding: 12, borderRadius: 12, border: "1px solid #eee"
-      }}>
-        <div><strong>Points</strong><div>{totals.points}</div></div>
-        <div><strong>Streak</strong><div>{totals.streak || 0} 🔥</div></div>
+      {/* Stats Grid */}
+      <div className="stats-grid">
+        <div className="stat-item">
+          <div className="stat-value">{totals.points}</div>
+          <div className="stat-label">Points</div>
+        </div>
+        <div className="stat-item">
+          <div className="stat-value">{totals.streak || 0}</div>
+          <div className="stat-label">Streak 🔥</div>
+        </div>
       </div>
 
-      {/* Paymaster Status */}
-      {paymasterStatus && (
-        <div style={{
-          background: paymasterStatus.available ? "#d1ecf1" : "#f8d7da",
-          border: paymasterStatus.available ? "1px solid #bee5eb" : "1px solid #f5c6cb",
-          padding: 12, borderRadius: 12, fontSize: 14
-        }}>
-          <div style={{ fontWeight: 600, marginBottom: 4 }}>
-            {paymasterStatus.available ? "⚡ Gas Sponsorship Active" : "💰 Gas Fees Required"}
-          </div>
-          <div style={{ fontSize: 12, color: "#666" }}>
-            {paymasterStatus.available 
-              ? "Your transactions are sponsored by Base team!" 
-              : paymasterStatus.configured 
-                ? "Wallet doesn't support gas sponsorship" 
-                : "Paymaster not configured"}
-          </div>
-        </div>
-      )}
-
-      {/* Network Status */}
-      {networkInfo && (
-        <div style={{
-          background: networkInfo.isCorrectNetwork ? "#d4edda" : "#f8d7da",
-          border: networkInfo.isCorrectNetwork ? "1px solid #c3e6cb" : "1px solid #f5c6cb",
-          padding: 12, borderRadius: 12, fontSize: 14
-        }}>
-          <div style={{ fontWeight: 600, marginBottom: 4 }}>
-            🌐 Network: {networkInfo.chainName}
-          </div>
-          {!networkInfo.isCorrectNetwork && (
-            <div style={{ color: "#721c24" }}>
-              ⚠️ Please switch to {networkInfo.expectedChainName}
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* Last Transaction */}
-      {lastTransaction && (
-        <div style={{
-          background: "#e8f5e8", padding: 12, borderRadius: 12, border: "1px solid #90ee90"
-        }}>
-          <div style={{ fontWeight: 600, marginBottom: 4 }}>✅ Last Transaction</div>
-          <div style={{ fontSize: 12, fontFamily: "monospace", marginBottom: 4 }}>
-            {lastTransaction.hash}
-          </div>
-          <a 
-            href={lastTransaction.explorerUrl} 
-            target="_blank" 
-            rel="noopener noreferrer"
-            style={{ fontSize: 12, color: "#0066cc", textDecoration: "underline" }}
-          >
-            View on BaseScan →
-          </a>
-        </div>
-      )}
-
+      {/* Badges */}
       {totals.badges.length > 0 && (
-        <div style={{
-          background: "#fff3cd", padding: 12, borderRadius: 12, border: "1px solid #ffeaa7"
-        }}>
-          <div style={{ fontWeight: 600, marginBottom: 4 }}>🏆 Badges Earned</div>
-          <div style={{ fontSize: 14 }}>
+        <div className="card status-success" style={{ padding: 'var(--spacing-md)' }}>
+          <div style={{ fontWeight: 'var(--font-weight-semibold)', marginBottom: 'var(--spacing-xs)' }}>
+            🏆 Badges Earned
+          </div>
+          <div style={{ fontSize: 'var(--font-size-sm)' }}>
             {totals.badges.join(", ")}
           </div>
         </div>
       )}
 
-      {/* Debug Info Toggle */}
-      <button 
-        onClick={() => setShowDebug(!showDebug)}
-        style={{
-          padding: 8, fontSize: 12, background: "#f8f9fa", border: "1px solid #dee2e6",
-          borderRadius: 8, cursor: "pointer"
-        }}
-      >
-        {showDebug ? "Hide" : "Show"} Debug Info
-      </button>
-
-      {showDebug && (
-        <div style={{
-          background: "#f8f9fa", padding: 12, borderRadius: 12, border: "1px solid #dee2e6",
-          fontSize: 12, fontFamily: "monospace"
-        }}>
-          <div><strong>Debug Information:</strong></div>
-          <div>Contract: {getDebugInfo().contractAddress}</div>
-          <div>Expected Chain: {getDebugInfo().expectedChainName} ({getDebugInfo().expectedChainId})</div>
-          <div>Current Chain: {networkInfo?.chainName} ({networkInfo?.chainId})</div>
-          <div>Explorer: {getDebugInfo().explorerUrl}</div>
-          <div>Wallet Connected: {address ? 'Yes' : 'No'}</div>
-          {address && <div>Address: {address}</div>}
-        </div>
+      {/* Celebration Effect */}
+      {celebrationActive && celebrationType && (
+        <CelebrationEffect 
+          isActive={celebrationActive}
+          type={celebrationType}
+          onComplete={completeCelebration}
+        />
       )}
 
+      {/* Toast */}
       {toast && (
         <div style={{
-          position: "fixed", bottom: 24, left: 12, right: 12, padding: 14,
-          background: "#111", color: "#fff", textAlign: "center", borderRadius: 12, zIndex: 50
-        }}>{toast}</div>
+          position: "fixed", 
+          bottom: 'var(--spacing-2xl)', 
+          left: 'var(--spacing-md)', 
+          right: 'var(--spacing-md)', 
+          padding: 'var(--spacing-lg)',
+          background: "var(--color-text)", 
+          color: "var(--color-background)", 
+          textAlign: "center", 
+          borderRadius: 'var(--radius-md)', 
+          zIndex: 50,
+          fontSize: 'var(--font-size-sm)',
+          fontWeight: 'var(--font-weight-medium)'
+        }}>
+          {toast}
+        </div>
       )}
     </div>
   );

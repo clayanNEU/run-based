@@ -56,53 +56,26 @@ export default function OnboardingModal({ isOpen, onClose }: OnboardingModalProp
           </button>
         </div>
 
-        <div style={{ marginBottom: 24 }}>
-          <p style={{ fontSize: 16, lineHeight: 1.5, color: "#666", margin: "0 0 16px 0" }}>
-            Earn permanent badges for every contribution to your running club. 
-            Your achievements are stored onchain on Base network.
+        <div style={{ marginBottom: 32, textAlign: "center" }}>
+          <h3 style={{ 
+            fontSize: 32, 
+            marginBottom: 16, 
+            color: "var(--color-primary)",
+            fontWeight: "var(--font-weight-bold)"
+          }}>
+            What did you do today?! 🏃‍♀️
+          </h3>
+          <p style={{ 
+            fontSize: 18, 
+            lineHeight: 1.5, 
+            color: "var(--color-text-secondary)", 
+            margin: 0,
+            maxWidth: 400,
+            marginLeft: "auto",
+            marginRight: "auto"
+          }}>
+            Track your contributions and earn permanent badges on Base blockchain.
           </p>
-        </div>
-
-        <div style={{ marginBottom: 24 }}>
-          <h3 style={{ fontSize: 18, marginBottom: 16 }}>Quick Start Checklist:</h3>
-          
-          <div style={{ display: "grid", gap: 12 }}>
-            <ChecklistItem 
-              number="1"
-              title="Connect Your Wallet"
-              description="Connect your wallet to start earning badges"
-              completed={false}
-            />
-            <ChecklistItem 
-              number="2"
-              title="Make Your First Contribution"
-              description="Tap 'Attend' to check in and earn your first badge"
-              completed={false}
-            />
-            <ChecklistItem 
-              number="3"
-              title="Share Your Achievement"
-              description="Share your badge to Base social feeds"
-              completed={false}
-            />
-          </div>
-        </div>
-
-        <div style={{ 
-          background: "#f0f8ff", 
-          padding: 16, 
-          borderRadius: 12,
-          marginBottom: 24
-        }}>
-          <h4 style={{ margin: "0 0 8px 0", fontSize: 16 }}>
-            💡 What makes this special?
-          </h4>
-          <ul style={{ margin: 0, paddingLeft: 20, fontSize: 14, color: "#666" }}>
-            <li>Your badges are permanent NFTs on Base blockchain</li>
-            <li>Tip other contributors with ETH to show appreciation</li>
-            <li>Climb the leaderboard with your contributions</li>
-            <li>Build ownership in your running club community</li>
-          </ul>
         </div>
 
         <div style={{ display: "flex", gap: 12 }}>
@@ -122,53 +95,6 @@ export default function OnboardingModal({ isOpen, onClose }: OnboardingModalProp
           >
             Get Started! 🚀
           </button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function ChecklistItem({ 
-  number, 
-  title, 
-  description, 
-  completed 
-}: { 
-  number: string; 
-  title: string; 
-  description: string; 
-  completed: boolean;
-}) {
-  return (
-    <div style={{
-      display: "flex",
-      gap: 12,
-      padding: 12,
-      background: completed ? "#e8f5e8" : "#f9f9f9",
-      borderRadius: 8,
-      border: `1px solid ${completed ? "#90ee90" : "#eee"}`
-    }}>
-      <div style={{
-        width: 24,
-        height: 24,
-        borderRadius: "50%",
-        background: completed ? "#4caf50" : "#ddd",
-        color: "#fff",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        fontSize: 12,
-        fontWeight: 600,
-        flexShrink: 0
-      }}>
-        {completed ? "✓" : number}
-      </div>
-      <div>
-        <div style={{ fontWeight: 600, marginBottom: 4 }}>
-          {title}
-        </div>
-        <div style={{ fontSize: 14, color: "#666" }}>
-          {description}
         </div>
       </div>
     </div>

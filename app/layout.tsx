@@ -47,12 +47,13 @@ export default function RootLayout({
           <div style={{ maxWidth: 480, margin: "0 auto", minHeight: "100dvh", display: "grid", gridTemplateRows: "1fr auto" }}>
             <main style={{ padding: 16 }}>{children}</main>
             <nav style={{
-              display: "grid", gridTemplateColumns: "1fr 1fr 1fr", borderTop: "1px solid #eee",
-              position: "sticky", bottom: 0, background: "#fff"
+              display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", borderTop: "1px solid var(--color-border)",
+              position: "sticky", bottom: 0, background: "var(--color-background)"
             }}>
-              <Tab href="/" label="Contribute" emoji="✨" />
+              <Tab href="/" label="Check-in" emoji="✅" />
               <Tab href="/leaderboard" label="Leaderboard" emoji="🏆" />
               <Tab href="/profile" label="Profile" emoji="🪪" />
+              <Tab href="/compete" label="Compete" emoji="⚡" isComingSoon={true} />
             </nav>
           </div>
         </RootProvider>
@@ -61,9 +62,26 @@ export default function RootLayout({
   );
 }
 
-function Tab({ href, label, emoji }: { href: string; label: string; emoji: string }) {
+function Tab({ href, label, emoji, isComingSoon = false }: { href: string; label: string; emoji: string; isComingSoon?: boolean }) {
+  if (isComingSoon) {
+    return (
+      <div style={{ 
+        textDecoration: "none", 
+        color: "var(--color-text-muted)", 
+        cursor: "not-allowed",
+        opacity: 0.6 
+      }}>
+        <div style={{ padding: 12, textAlign: "center" }}>
+          <div style={{ fontSize: 20 }}>{emoji}</div>
+          <div style={{ fontSize: 12 }}>{label}</div>
+          <div style={{ fontSize: 10, color: "var(--color-text-muted)" }}>Soon</div>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <Link href={href} style={{ textDecoration: "none", color: "#111" }}>
+    <Link href={href} style={{ textDecoration: "none", color: "var(--color-text)" }}>
       <div style={{ padding: 12, textAlign: "center" }}>
         <div style={{ fontSize: 20 }}>{emoji}</div>
         <div style={{ fontSize: 12 }}>{label}</div>

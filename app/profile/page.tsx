@@ -2,46 +2,55 @@
 
 import * as React from "react";
 import { useAccount } from 'wagmi';
-import { getBlockchainTotals, getNetworkInfo, getDebugInfo, type BlockchainTotals } from "../../lib/blockchain-store";
+import { getBlockchainTotals, type BlockchainTotals } from "../../lib/blockchain-store";
+import { useBasename, isBasename } from "../../lib/basename-resolver";
+import { DetailedProfileStats } from "../../components/ProfileStats";
 
 export default function ProfilePage() {
   const { address } = useAccount();
+  const { basename, isLoading: basenameLoading } = useBasename(address);
   const [totals, setTotals] = React.useState<BlockchainTotals>({
     attend: 0, host: 0, pace: 0, supplies: 0,
     points: 0, streak: 0, badges: [],
     tipsReceived: 0, tipsSent: 0
   });
-  const [networkInfo, setNetworkInfo] = React.useState<{
-    chainId: number;
-    chainName: string;
-    isCorrectNetwork: boolean;
-    expectedChainId: number;
-    expectedChainName: string;
-  } | null>(null);
 
-  // Load blockchain data and network info when wallet connects
+  // Load blockchain data when wallet connects
   React.useEffect(() => {
     if (address) {
       getBlockchainTotals(address).then(setTotals);
-      getNetworkInfo().then(setNetworkInfo);
     }
   }, [address]);
 
   if (!address) {
     return (
-      <div style={{ display: "grid", gap: 16 }}>
-        <h2 style={{ marginTop: 0 }}>My Profile</h2>
-        <div style={{ 
-          padding: 20, 
-          background: "#f9f9f9", 
-          borderRadius: 12,
-          textAlign: "center"
+      <div style={{ display: "grid", gap: 'var(--spacing-lg)' }}>
+        <h2 style={{ 
+          marginTop: 0, 
+          fontSize: 'var(--font-size-2xl)',
+          fontWeight: 'var(--font-weight-bold)',
+          color: 'var(--color-text)'
         }}>
-          <div style={{ fontSize: 48, marginBottom: 12 }}>🔗</div>
-          <div style={{ fontSize: 18, fontWeight: 600, marginBottom: 8 }}>
+          My Profile
+        </h2>
+        <div className="card" style={{ 
+          padding: 'var(--spacing-xl)', 
+          textAlign: "center",
+          background: 'var(--color-surface)'
+        }}>
+          <div style={{ fontSize: '48px', marginBottom: 'var(--spacing-md)' }}>🔗</div>
+          <div style={{ 
+            fontSize: 'var(--font-size-lg)', 
+            fontWeight: 'var(--font-weight-semibold)', 
+            marginBottom: 'var(--spacing-sm)',
+            color: 'var(--color-text)'
+          }}>
             Connect Wallet
           </div>
-          <div style={{ fontSize: 14, color: "#666" }}>
+          <div style={{ 
+            fontSize: 'var(--font-size-sm)', 
+            color: 'var(--color-text-secondary)' 
+          }}>
             Connect your wallet to view your contribution profile and NFT collection
           </div>
         </div>
@@ -49,131 +58,184 @@ export default function ProfilePage() {
     );
   }
 
-  const badges = totals.badges.length ? totals.badges : ["No badges yet"];
-
   return (
-    <div style={{ display: "grid", gap: 16 }}>
-      <div>
-        <h2 style={{ marginTop: 0 }}>My Profile</h2>
-        <div style={{ fontSize: 14, color: "#666", fontFamily: "monospace" }}>
-          {address}
-        </div>
-      </div>
-
-      {/* Badge Collection */}
-      <div>
-        <h3 style={{ marginBottom: 12 }}>🏆 Badge Collection</h3>
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
-          <BadgeCard emoji="✅" label="Attend" count={totals.attend} />
-          <BadgeCard emoji="🏁" label="Host" count={totals.host} />
-          <BadgeCard emoji="⏱️" label="Pace" count={totals.pace} />
-          <BadgeCard emoji="🧃" label="Supplies" count={totals.supplies} />
-        </div>
-        <div style={{ 
-          fontSize: 12, 
-          color: "#888", 
-          marginTop: 8,
-          textAlign: "center"
-        }}>
-          <span title="Your badges are permanently stored onchain on Base network">
-            ⓘ Badges are onchain & permanent on Base
-          </span>
-        </div>
-      </div>
-
-      {/* Stats */}
-      <div>
-        <h3 style={{ marginBottom: 12 }}>📊 Stats</h3>
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
-          <Stat label="Total Points" value={totals.points} />
-          <Stat label="Current Streak" value={`${totals.streak || 0} 🔥`} />
-          <Stat label="Tips Received" value={`${(totals.tipsReceived / 1e18).toFixed(4)} ETH`} />
-          <Stat label="Tips Sent" value={`${(totals.tipsSent / 1e18).toFixed(4)} ETH`} />
-        </div>
-      </div>
-
-      {/* Achievement Badges */}
-      <div>
-        <h3 style={{ marginBottom: 12 }}>🎖️ Achievement Badges</h3>
-        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-          {badges.map((badge, i) => (
-            <span 
-              key={i} 
-              style={{ 
-                padding: "8px 12px", 
-                borderRadius: 999, 
-                background: badge === "No badges yet" ? "#f1f1f1" : "#e8f5e8", 
-                fontSize: 12,
-                border: badge === "No badges yet" ? "1px solid #ddd" : "1px solid #90ee90"
-              }}
-            >
-              {badge}
-            </span>
-          ))}
-        </div>
-      </div>
-
-      {/* Network Status */}
-      {networkInfo && (
-        <div>
-          <h3 style={{ marginBottom: 12 }}>🌐 Network Status</h3>
-          <div style={{
-            background: networkInfo.isCorrectNetwork ? "#d4edda" : "#f8d7da",
-            border: networkInfo.isCorrectNetwork ? "1px solid #c3e6cb" : "1px solid #f5c6cb",
-            padding: 12, borderRadius: 12, fontSize: 14
-          }}>
-            <div style={{ fontWeight: 600, marginBottom: 4 }}>
-              Connected to: {networkInfo.chainName}
-            </div>
-            {!networkInfo.isCorrectNetwork && (
-              <div style={{ color: "#721c24" }}>
-                ⚠️ Please switch to {networkInfo.expectedChainName} to use the app
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-
-
-      {/* Debug Information */}
-      <div>
-        <h3 style={{ marginBottom: 12 }}>🔧 Debug Information</h3>
+    <div style={{ display: "grid", gap: 'var(--spacing-lg)' }}>
+      {/* Profile Header */}
+      <div style={{ textAlign: 'center', padding: 'var(--spacing-lg) 0' }}>
+        {/* Profile Avatar */}
         <div style={{
-          background: "#f8f9fa", padding: 12, borderRadius: 12, border: "1px solid #dee2e6",
-          fontSize: 12, fontFamily: "monospace"
+          width: '80px',
+          height: '80px',
+          borderRadius: '50%',
+          background: 'linear-gradient(135deg, var(--color-primary), var(--color-accent))',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          margin: '0 auto var(--spacing-md)',
+          fontSize: 'var(--font-size-2xl)',
+          color: 'white',
+          fontWeight: 'var(--font-weight-bold)'
         }}>
-          <div><strong>Contract Address:</strong> {getDebugInfo().contractAddress}</div>
-          <div><strong>Expected Network:</strong> {getDebugInfo().expectedChainName} ({getDebugInfo().expectedChainId})</div>
-          <div><strong>Current Network:</strong> {networkInfo?.chainName} ({networkInfo?.chainId})</div>
-          <div><strong>Network Status:</strong> {networkInfo?.isCorrectNetwork ? '✅ Correct' : '❌ Wrong'}</div>
-          <div><strong>Explorer:</strong> <a href={getDebugInfo().explorerUrl} target="_blank" rel="noopener noreferrer" style={{ color: "#0066cc" }}>{getDebugInfo().explorerUrl}</a></div>
+          🏃‍♀️
+        </div>
+        
+        {/* Username/Address */}
+        <div style={{ marginBottom: 'var(--spacing-sm)' }}>
+          {basenameLoading ? (
+            <div style={{ 
+              fontSize: 'var(--font-size-lg)',
+              color: 'var(--color-text-secondary)'
+            }}>
+              Loading...
+            </div>
+          ) : (
+            <h2 style={{ 
+              margin: 0,
+              fontSize: 'var(--font-size-xl)',
+              fontWeight: 'var(--font-weight-bold)',
+              color: 'var(--color-text)'
+            }}>
+              {isBasename(basename) ? basename : 'Runner'}
+            </h2>
+          )}
+        </div>
+        
+        {/* Address */}
+        <div style={{ 
+          fontSize: 'var(--font-size-sm)', 
+          color: 'var(--color-text-secondary)',
+          fontFamily: 'monospace',
+          background: 'var(--color-surface)',
+          padding: 'var(--spacing-xs) var(--spacing-md)',
+          borderRadius: 'var(--radius-full)',
+          display: 'inline-block'
+        }}>
+          {basename}
+        </div>
+      </div>
+
+      {/* Stats Section */}
+      <div>
+        <h3 style={{ 
+          marginBottom: 'var(--spacing-md)',
+          fontSize: 'var(--font-size-lg)',
+          fontWeight: 'var(--font-weight-semibold)',
+          color: 'var(--color-text)'
+        }}>
+          📊 Your Stats
+        </h3>
+        <DetailedProfileStats totals={totals} showBreakdown={false} />
+      </div>
+
+      {/* Quick Actions */}
+      <div className="card" style={{ padding: 'var(--spacing-lg)' }}>
+        <h3 style={{ 
+          marginTop: 0,
+          marginBottom: 'var(--spacing-md)',
+          fontSize: 'var(--font-size-lg)',
+          fontWeight: 'var(--font-weight-semibold)',
+          color: 'var(--color-text)'
+        }}>
+          🚀 Quick Actions
+        </h3>
+        <div style={{ 
+          display: 'grid', 
+          gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', 
+          gap: 'var(--spacing-md)' 
+        }}>
+          <QuickActionButton 
+            emoji="✅" 
+            label="Check In" 
+            description="Record attendance"
+            href="/"
+          />
+          <QuickActionButton 
+            emoji="🏆" 
+            label="Leaderboard" 
+            description="See rankings"
+            href="/leaderboard"
+          />
+          <QuickActionButton 
+            emoji="🎯" 
+            label="Compete" 
+            description="Coming soon"
+            href="/compete"
+            disabled
+          />
+        </div>
+      </div>
+
+      {/* Blockchain Info */}
+      <div className="card" style={{ padding: 'var(--spacing-md)' }}>
+        <div style={{
+          fontSize: 'var(--font-size-xs)',
+          color: 'var(--color-text-muted)',
+          textAlign: 'center',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          gap: 'var(--spacing-xs)'
+        }}>
+          <span>⛓️</span>
+          <span>Your achievements are permanently stored on Base blockchain</span>
         </div>
       </div>
     </div>
   );
 }
 
-function BadgeCard({ emoji, label, count }: { emoji: string; label: string; count: number }) {
-  return (
-    <div style={{ 
-      border: "1px solid #e8e8e8", 
-      borderRadius: 12, 
-      padding: 12,
-      textAlign: "center",
-      background: count > 0 ? "#f0f8ff" : "#fff"
+function QuickActionButton({ 
+  emoji, 
+  label, 
+  description, 
+  href, 
+  disabled = false 
+}: { 
+  emoji: string; 
+  label: string; 
+  description: string; 
+  href: string;
+  disabled?: boolean;
+}) {
+  const buttonContent = (
+    <div style={{
+      padding: 'var(--spacing-md)',
+      borderRadius: 'var(--radius-md)',
+      border: `1px solid var(--color-border)`,
+      background: disabled ? 'var(--color-surface)' : 'var(--color-background)',
+      textAlign: 'center',
+      cursor: disabled ? 'not-allowed' : 'pointer',
+      opacity: disabled ? 0.6 : 1,
+      transition: 'all 0.2s ease',
+      textDecoration: 'none',
+      color: 'inherit'
     }}>
-      <div style={{ fontSize: 24, marginBottom: 4 }}>{emoji}</div>
-      <div style={{ fontWeight: 700, fontSize: 18, marginBottom: 2 }}>{count}</div>
-      <div style={{ fontSize: 12, color: "#777" }}>{label} Badges</div>
+      <div style={{ fontSize: 'var(--font-size-2xl)', marginBottom: 'var(--spacing-xs)' }}>
+        {emoji}
+      </div>
+      <div style={{ 
+        fontWeight: 'var(--font-weight-semibold)', 
+        marginBottom: 'var(--spacing-xs)',
+        fontSize: 'var(--font-size-sm)'
+      }}>
+        {label}
+      </div>
+      <div style={{ 
+        fontSize: 'var(--font-size-xs)', 
+        color: 'var(--color-text-secondary)' 
+      }}>
+        {description}
+      </div>
     </div>
   );
-}
 
-function Stat({ label, value }: { label: string; value: React.ReactNode }) {
+  if (disabled) {
+    return buttonContent;
+  }
+
   return (
-    <div style={{ border: "1px solid #eee", borderRadius: 12, padding: 12 }}>
-      <div style={{ fontSize: 12, color: "#777" }}>{label}</div>
-      <div style={{ fontWeight: 700, fontSize: 18 }}>{value}</div>
-    </div>
+    <a href={href} style={{ textDecoration: 'none', color: 'inherit' }}>
+      {buttonContent}
+    </a>
   );
 }

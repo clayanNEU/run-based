@@ -30,18 +30,7 @@ export default function Page() {
           <div>
             <h1 style={{ margin: 0 }}>Stride & Rise</h1>
             <p style={{ marginTop: 4, color: "#666" }}>
-              Earn badges for every contribution 
-              <span style={{ 
-                fontSize: 12, 
-                color: "#888", 
-                marginLeft: 8,
-                padding: "2px 6px",
-                background: "#f0f0f0",
-                borderRadius: 4,
-                cursor: "help"
-              }} title="Your badges are permanently stored onchain on Base network">
-                ⓘ onchain & permanent on Base
-              </span>
+              Earn badges for every contribution
             </p>
           </div>
           <button
