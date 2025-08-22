@@ -1,7 +1,10 @@
 "use client";
 
-import { encodeFunctionData, parseEther } from 'viem';
-import ContributionBadgesABI from './ContributionBadges.json';
+import { encodeFunctionData, parseUnits } from 'viem';
+import ContributionBadgesABI from './ContributionBadgesV2.json';
+
+// USDC has 6 decimals
+const USDC_DECIMALS = 6;
 
 // Configuration
 const CONTRACT_ADDRESS = process.env.NEXT_PUBLIC_CONTRACT_ADDRESS as `0x${string}`;
@@ -48,7 +51,7 @@ export async function makeContributionSponsored(type: ContributionType): Promise
   try {
     // Encode the contract call
     const callData = encodeFunctionData({
-      abi: ContributionBadgesABI,
+      abi: ContributionBadgesABI.abi,
       functionName: 'makeContribution',
       args: [CONTRIBUTION_TYPES[type]]
     });
@@ -91,7 +94,7 @@ export async function makeContributionSponsored(type: ContributionType): Promise
 }
 
 /**
- * Send a sponsored tip using ERC-4337 wallet_sendCalls
+ * Send a sponsored USDC tip using ERC-4337 wallet_sendCalls
  */
 export async function sendTipSponsored(
   recipientAddress: string, 
@@ -102,7 +105,7 @@ export async function sendTipSponsored(
     throw new Error('Paymaster not available');
   }
 
-  console.log('Attempting sponsored tip:', { recipient: recipientAddress, amount, message });
+  console.log('Attempting sponsored USDC tip:', { recipient: recipientAddress, amount, message });
 
   const ethereum = (window as { ethereum?: { request: (args: { method: string; params?: unknown[] }) => Promise<unknown> } }).ethereum;
   if (!ethereum) {
@@ -116,16 +119,15 @@ export async function sendTipSponsored(
   }
 
   try {
-    // Encode the contract call
-    const callData = encodeFunctionData({
-      abi: ContributionBadgesABI,
-      functionName: 'tipContributor',
-      args: [recipientAddress, message]
-    });
+    // Convert USDC amount to proper units (6 decimals)
+    const amountInUnits = parseUnits(amount, USDC_DECIMALS);
 
-    // Convert ETH amount to hex
-    const tipValue = parseEther(amount);
-    const valueHex = `0x${tipValue.toString(16)}`;
+    // Encode the contract call for USDC tipping
+    const callData = encodeFunctionData({
+      abi: ContributionBadgesABI.abi,
+      functionName: 'tipContributorUSDC',
+      args: [recipientAddress, amountInUnits, message]
+    });
 
     // Use wallet_sendCalls with paymaster capability
     const result = await ethereum.request({
@@ -136,7 +138,7 @@ export async function sendTipSponsored(
         from: account,
         calls: [{
           to: CONTRACT_ADDRESS,
-          value: valueHex, // User pays this
+          value: "0x0", // No ETH value for USDC tips
           data: callData
         }],
         capabilities: {
@@ -147,13 +149,13 @@ export async function sendTipSponsored(
       }]
     }) as string;
 
-    console.log('Sponsored tip transaction submitted:', result);
+    console.log('Sponsored USDC tip transaction submitted:', result);
 
     const explorerUrl = `https://basescan.org/tx/${result}`;
     return { hash: result, explorerUrl };
 
   } catch (error) {
-    console.error('Sponsored tip failed:', error);
+    console.error('Sponsored USDC tip failed:', error);
     
     // Check if it's a paymaster-specific error
     if (isPaymasterError(error)) {

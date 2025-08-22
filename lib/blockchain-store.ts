@@ -1,8 +1,8 @@
 "use client";
 
-import { createPublicClient, createWalletClient, custom, parseEther } from 'viem';
+import { createPublicClient, createWalletClient, custom, parseUnits, formatUnits } from 'viem';
 import { base } from 'viem/chains';
-import ContributionBadgesABI from './ContributionBadges.json';
+import ContributionBadgesABI from './ContributionBadgesV2.json';
 import { 
   makeContributionSponsored, 
   sendTipSponsored, 
@@ -14,6 +14,7 @@ import {
 
 // Contract configuration
 const CONTRACT_ADDRESS = process.env.NEXT_PUBLIC_CONTRACT_ADDRESS as `0x${string}`;
+const USDC_ADDRESS = process.env.NEXT_PUBLIC_USDC_ADDRESS as `0x${string}`;
 const CONTRIBUTION_TYPES = { 
   ATTEND: 1, 
   HOST: 2, 
@@ -24,6 +25,9 @@ const CONTRIBUTION_TYPES = {
 // Network configuration
 const EXPECTED_CHAIN = base; // Base Mainnet
 const EXPECTED_CHAIN_ID = 8453;
+
+// USDC has 6 decimals (not 18 like ETH)
+const USDC_DECIMALS = 6;
 
 // Types
 export type ContributionType = keyof typeof CONTRIBUTION_TYPES;
@@ -36,8 +40,8 @@ export type BlockchainTotals = {
   points: number;
   badges: string[];
   streak: number;
-  tipsReceived: number;
-  tipsSent: number;
+  tipsReceived: number; // in USDC
+  tipsSent: number;     // in USDC
 };
 
 const defaultTotals: BlockchainTotals = { 
@@ -45,6 +49,31 @@ const defaultTotals: BlockchainTotals = {
   points: 0, badges: [], streak: 0, 
   tipsReceived: 0, tipsSent: 0 
 };
+
+// ERC-20 ABI for USDC operations
+const ERC20_ABI = [
+  {
+    "inputs": [{"name": "spender", "type": "address"}, {"name": "amount", "type": "uint256"}],
+    "name": "approve",
+    "outputs": [{"name": "", "type": "bool"}],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [{"name": "owner", "type": "address"}, {"name": "spender", "type": "address"}],
+    "name": "allowance",
+    "outputs": [{"name": "", "type": "uint256"}],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [{"name": "account", "type": "address"}],
+    "name": "balanceOf",
+    "outputs": [{"name": "", "type": "uint256"}],
+    "stateMutability": "view",
+    "type": "function"
+  }
+] as const;
 
 /**
  * Load user data from blockchain
@@ -68,7 +97,7 @@ export async function getBlockchainTotals(userAddress?: string): Promise<Blockch
 
     const [contributions, stats, badges] = await publicClient.readContract({
       address: CONTRACT_ADDRESS,
-      abi: ContributionBadgesABI,
+      abi: ContributionBadgesABI.abi,
       functionName: 'getUserData',
       args: [userAddress]
     }) as [bigint[], { totalPoints: bigint; currentStreak: bigint; totalTipsReceived: bigint; totalTipsSent: bigint }, string[]];
@@ -81,8 +110,8 @@ export async function getBlockchainTotals(userAddress?: string): Promise<Blockch
       points: Number(stats.totalPoints),
       streak: Number(stats.currentStreak),
       badges: badges,
-      tipsReceived: Number(stats.totalTipsReceived),
-      tipsSent: Number(stats.totalTipsSent)
+      tipsReceived: Number(formatUnits(stats.totalTipsReceived, USDC_DECIMALS)),
+      tipsSent: Number(formatUnits(stats.totalTipsSent, USDC_DECIMALS))
     };
   } catch (error) {
     console.error('Failed to load from blockchain:', error);
@@ -132,7 +161,7 @@ export async function makeContributionWithSponsorship(type: ContributionType): P
 }
 
 /**
- * Send tip with sponsored transaction first, fallback to regular
+ * Send USDC tip with sponsored transaction first, fallback to regular
  */
 export async function sendTipWithSponsorship(
   recipientAddress: string, 
@@ -147,9 +176,9 @@ export async function sendTipWithSponsorship(
   // Try sponsored transaction first if paymaster is available
   if (isPaymasterAvailable()) {
     try {
-      console.log('Attempting sponsored tip...');
+      console.log('Attempting sponsored USDC tip...');
       const result = await sendTipSponsored(recipientAddress, amount, message);
-      console.log('✅ Sponsored tip successful!');
+      console.log('✅ Sponsored USDC tip successful!');
       return { ...result, sponsored: true };
     } catch (error) {
       if (error instanceof PaymasterError) {
@@ -157,7 +186,7 @@ export async function sendTipWithSponsorship(
         console.log('⚠️ Sponsored tip failed, falling back to regular transaction:', fallbackReason);
         
         try {
-          const result = await sendBlockchainTip(recipientAddress, amount, message);
+          const result = await sendUSDCTip(recipientAddress, amount, message);
           return { ...result, sponsored: false, fallbackReason };
         } catch (fallbackError) {
           console.error('❌ Fallback tip also failed:', fallbackError);
@@ -171,8 +200,8 @@ export async function sendTipWithSponsorship(
   }
 
   // Use regular transaction if paymaster not available
-  console.log('Using regular tip transaction (paymaster not available)');
-  const result = await sendBlockchainTip(recipientAddress, amount, message);
+  console.log('Using regular USDC tip transaction (paymaster not available)');
+  const result = await sendUSDCTip(recipientAddress, amount, message);
   return { ...result, sponsored: false, fallbackReason: 'Paymaster not configured' };
 }
 
@@ -192,6 +221,204 @@ export async function getPaymasterStatus(): Promise<{
     walletSupported,
     configured
   };
+}
+
+/**
+ * Check USDC allowance for the contract
+ */
+export async function getUSDCAllowance(userAddress: string): Promise<number> {
+  if (!userAddress || !CONTRACT_ADDRESS || !USDC_ADDRESS) {
+    return 0;
+  }
+
+  try {
+    const ethereum = (window as { ethereum?: { request: (args: { method: string; params?: unknown[] }) => Promise<unknown> } }).ethereum;
+    if (!ethereum) {
+      throw new Error('No ethereum provider found');
+    }
+
+    const publicClient = createPublicClient({
+      chain: EXPECTED_CHAIN,
+      transport: custom(ethereum)
+    });
+
+    const allowance = await publicClient.readContract({
+      address: USDC_ADDRESS,
+      abi: ERC20_ABI,
+      functionName: 'allowance',
+      args: [userAddress as `0x${string}`, CONTRACT_ADDRESS]
+    }) as bigint;
+
+    return Number(formatUnits(allowance, USDC_DECIMALS));
+  } catch (error) {
+    console.error('Failed to get USDC allowance:', error);
+    return 0;
+  }
+}
+
+/**
+ * Get USDC balance for user
+ */
+export async function getUSDCBalance(userAddress: string): Promise<number> {
+  if (!userAddress || !USDC_ADDRESS) {
+    return 0;
+  }
+
+  try {
+    const ethereum = (window as { ethereum?: { request: (args: { method: string; params?: unknown[] }) => Promise<unknown> } }).ethereum;
+    if (!ethereum) {
+      throw new Error('No ethereum provider found');
+    }
+
+    const publicClient = createPublicClient({
+      chain: EXPECTED_CHAIN,
+      transport: custom(ethereum)
+    });
+
+    const balance = await publicClient.readContract({
+      address: USDC_ADDRESS,
+      abi: ERC20_ABI,
+      functionName: 'balanceOf',
+      args: [userAddress as `0x${string}`]
+    }) as bigint;
+
+    return Number(formatUnits(balance, USDC_DECIMALS));
+  } catch (error) {
+    console.error('Failed to get USDC balance:', error);
+    return 0;
+  }
+}
+
+/**
+ * Approve USDC spending for the contract
+ */
+export async function approveUSDC(amount: string): Promise<{ hash: string; explorerUrl: string }> {
+  if (!CONTRACT_ADDRESS || !USDC_ADDRESS) {
+    throw new Error('Contract or USDC address not configured');
+  }
+
+  const ethereum = (window as { ethereum?: { request: (args: { method: string; params?: unknown[] }) => Promise<unknown> } }).ethereum;
+  if (!ethereum) {
+    throw new Error('No ethereum provider found');
+  }
+
+  // Check network
+  const chainId = await ethereum.request({ method: 'eth_chainId' }) as string;
+  const currentChainId = parseInt(chainId, 16);
+  
+  if (currentChainId !== EXPECTED_CHAIN_ID) {
+    throw new Error(`Wrong network. Please switch to Base Mainnet (Chain ID: ${EXPECTED_CHAIN_ID}). Currently on Chain ID: ${currentChainId}`);
+  }
+
+  const publicClient = createPublicClient({
+    chain: EXPECTED_CHAIN,
+    transport: custom(ethereum)
+  });
+
+  const walletClient = createWalletClient({
+    chain: EXPECTED_CHAIN,
+    transport: custom(ethereum)
+  });
+
+  const [account] = await ethereum.request({ method: 'eth_accounts' }) as string[];
+  if (!account) {
+    throw new Error('No account connected');
+  }
+
+  const amountInUnits = parseUnits(amount, USDC_DECIMALS);
+
+  console.log('Approving USDC spending:', { amount, amountInUnits: amountInUnits.toString(), contract: CONTRACT_ADDRESS });
+
+  // Submit approval transaction
+  const hash = await walletClient.writeContract({
+    address: USDC_ADDRESS,
+    abi: ERC20_ABI,
+    functionName: 'approve',
+    args: [CONTRACT_ADDRESS, amountInUnits],
+    account: account as `0x${string}`
+  });
+
+  console.log('USDC approval transaction submitted:', hash);
+
+  // Wait for transaction confirmation
+  const receipt = await publicClient.waitForTransactionReceipt({ 
+    hash,
+    timeout: 60_000 // 60 second timeout
+  });
+
+  console.log('USDC approval confirmed:', receipt);
+
+  const explorerUrl = `https://basescan.org/tx/${hash}`;
+  
+  return { hash, explorerUrl };
+}
+
+/**
+ * Send USDC tip on blockchain with proper transaction handling
+ */
+export async function sendUSDCTip(
+  recipientAddress: string, 
+  amount: string, 
+  message: string
+): Promise<{ hash: string; explorerUrl: string }> {
+  if (!CONTRACT_ADDRESS) {
+    throw new Error('Contract address not configured');
+  }
+
+  const ethereum = (window as { ethereum?: { request: (args: { method: string; params?: unknown[] }) => Promise<unknown> } }).ethereum;
+  if (!ethereum) {
+    throw new Error('No ethereum provider found');
+  }
+
+  // Check network
+  const chainId = await ethereum.request({ method: 'eth_chainId' }) as string;
+  const currentChainId = parseInt(chainId, 16);
+  
+  if (currentChainId !== EXPECTED_CHAIN_ID) {
+    throw new Error(`Wrong network. Please switch to Base Mainnet (Chain ID: ${EXPECTED_CHAIN_ID}). Currently on Chain ID: ${currentChainId}`);
+  }
+
+  const publicClient = createPublicClient({
+    chain: EXPECTED_CHAIN,
+    transport: custom(ethereum)
+  });
+
+  const walletClient = createWalletClient({
+    chain: EXPECTED_CHAIN,
+    transport: custom(ethereum)
+  });
+
+  const [account] = await ethereum.request({ method: 'eth_accounts' }) as string[];
+  if (!account) {
+    throw new Error('No account connected');
+  }
+
+  const amountInUnits = parseUnits(amount, USDC_DECIMALS);
+
+  console.log('Sending USDC tip:', { recipient: recipientAddress, amount, amountInUnits: amountInUnits.toString(), message, account });
+
+  // Submit transaction
+  const hash = await walletClient.writeContract({
+    address: CONTRACT_ADDRESS,
+    abi: ContributionBadgesABI.abi,
+    functionName: 'tipContributorUSDC',
+    args: [recipientAddress, amountInUnits, message],
+    account: account as `0x${string}`
+  });
+
+  console.log('USDC tip transaction submitted:', hash);
+
+  // Wait for transaction confirmation
+  const receipt = await publicClient.waitForTransactionReceipt({ 
+    hash,
+    timeout: 60_000 // 60 second timeout
+  });
+
+  console.log('USDC tip transaction confirmed:', receipt);
+
+  const explorerUrl = `https://basescan.org/tx/${hash}`;
+  
+  return { hash, explorerUrl };
 }
 
 /**
@@ -235,7 +462,7 @@ export async function makeBlockchainContribution(type: ContributionType): Promis
   // Submit transaction
   const hash = await walletClient.writeContract({
     address: CONTRACT_ADDRESS,
-    abi: ContributionBadgesABI,
+    abi: ContributionBadgesABI.abi,
     functionName: 'makeContribution',
     args: [CONTRIBUTION_TYPES[type]],
     account: account as `0x${string}`
@@ -250,73 +477,6 @@ export async function makeBlockchainContribution(type: ContributionType): Promis
   });
 
   console.log('Transaction confirmed:', receipt);
-
-  const explorerUrl = `https://basescan.org/tx/${hash}`;
-  
-  return { hash, explorerUrl };
-}
-
-/**
- * Send tip on blockchain with proper transaction handling
- */
-export async function sendBlockchainTip(
-  recipientAddress: string, 
-  amount: string, 
-  message: string
-): Promise<{ hash: string; explorerUrl: string }> {
-  if (!CONTRACT_ADDRESS) {
-    throw new Error('Contract address not configured');
-  }
-
-  const ethereum = (window as { ethereum?: { request: (args: { method: string; params?: unknown[] }) => Promise<unknown> } }).ethereum;
-  if (!ethereum) {
-    throw new Error('No ethereum provider found');
-  }
-
-  // Check network
-  const chainId = await ethereum.request({ method: 'eth_chainId' }) as string;
-  const currentChainId = parseInt(chainId, 16);
-  
-  if (currentChainId !== EXPECTED_CHAIN_ID) {
-    throw new Error(`Wrong network. Please switch to Base Mainnet (Chain ID: ${EXPECTED_CHAIN_ID}). Currently on Chain ID: ${currentChainId}`);
-  }
-
-  const publicClient = createPublicClient({
-    chain: EXPECTED_CHAIN,
-    transport: custom(ethereum)
-  });
-
-  const walletClient = createWalletClient({
-    chain: EXPECTED_CHAIN,
-    transport: custom(ethereum)
-  });
-
-  const [account] = await ethereum.request({ method: 'eth_accounts' }) as string[];
-  if (!account) {
-    throw new Error('No account connected');
-  }
-
-  console.log('Sending tip:', { recipient: recipientAddress, amount, message, account });
-
-  // Submit transaction
-  const hash = await walletClient.writeContract({
-    address: CONTRACT_ADDRESS,
-    abi: ContributionBadgesABI,
-    functionName: 'tipContributor',
-    args: [recipientAddress, message],
-    value: parseEther(amount),
-    account: account as `0x${string}`
-  });
-
-  console.log('Tip transaction submitted:', hash);
-
-  // Wait for transaction confirmation
-  const receipt = await publicClient.waitForTransactionReceipt({ 
-    hash,
-    timeout: 60_000 // 60 second timeout
-  });
-
-  console.log('Tip transaction confirmed:', receipt);
 
   const explorerUrl = `https://basescan.org/tx/${hash}`;
   
@@ -362,11 +522,10 @@ export function getSuccessMessage(type: ContributionType): string {
 }
 
 /**
- * Format ETH amount for display
+ * Format USDC amount for display
  */
-export function formatEthAmount(wei: bigint): string {
-  const eth = Number(wei) / 1e18;
-  return eth.toFixed(4);
+export function formatUSDCAmount(amount: number): string {
+  return `$${amount.toFixed(2)}`;
 }
 
 /**
@@ -429,11 +588,19 @@ export function getContractAddress(): string | undefined {
 }
 
 /**
+ * Get USDC address (for debugging)
+ */
+export function getUSDCAddress(): string | undefined {
+  return USDC_ADDRESS;
+}
+
+/**
  * Get debug information
  */
 export function getDebugInfo() {
   return {
     contractAddress: CONTRACT_ADDRESS,
+    usdcAddress: USDC_ADDRESS,
     expectedChainId: EXPECTED_CHAIN_ID,
     expectedChainName: 'Base Mainnet',
     explorerUrl: 'https://basescan.org'
