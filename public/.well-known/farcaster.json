@@ -31,5 +31,8 @@
     "ogImageUrl": "https://run-based.vercel.app/hero.png",
     "castShareUrl": "https://run-based.vercel.app",
     "webhookUrl": "https://run-based.vercel.app/api/webhook"
+  },
+   "baseBuilder": {
+    "allowedAddresses": ["0xE2D858b3D24787F4AF64BBc1380dBF34386274d9"]
   }
 }
